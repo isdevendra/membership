@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   UserPlus,
   Users,
+  Award,
 } from "lucide-react";
 
 import {
@@ -36,6 +37,11 @@ const menuItems = [
     icon: UserPlus,
     label: "Enrollment",
   },
+    {
+    href: "/rewards",
+    icon: Award,
+    label: "Rewards",
+  },
   {
     href: "/profiler",
     icon: BrainCircuit,
@@ -64,7 +70,7 @@ export function AppSidebar() {
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton
                 asChild
-                isActive={pathname === item.href}
+                isActive={pathname.startsWith(item.href)}
                 tooltip={{ children: item.label }}
               >
                 <Link href={item.href}>
