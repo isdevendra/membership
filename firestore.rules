@@ -67,14 +67,11 @@ service cloud.firestore {
      * @principle Enforces document ownership for writes and reads.
      */
     match /memberships/{membershipId} {
-      // Read rules: Only the owner can read their own membership.
-      allow get: if isOwner(membershipId);
-      allow list: if false;
-
-      // Write rules: Only the owner can create, update, or delete their own membership.
-      allow create: if isOwner(membershipId);
-      allow update: if isExistingOwner(membershipId);
-      allow delete: if isExistingOwner(membershipId);
+      // Read rules: Any signed-in user can read the list of members.
+      allow get, list: if isSignedIn();
+      
+      // Write rules: Any signed-in user can create/update/delete.
+      allow write: if isSignedIn();
     }
 
     /**
@@ -119,14 +116,8 @@ service cloud.firestore {
      * @principle Enforces document ownership for redemptions.
      */
     match /memberships/{membershipId}/redemptions/{redemptionId} {
-      // Read rules: Only the owner can read their own redemptions.
-      allow get: if isOwner(membershipId);
-      allow list: if isOwner(membershipId);
-
-      // Write rules: Only the owner can create, update, or delete their own redemptions.
-      allow create: if isOwner(membershipId);
-      allow update: if isExistingOwner(membershipId);
-      allow delete: if isExistingOwner(membershipId);
+      // Read/Write rules: Only the owner can manage their own redemptions.
+      allow read, write: if isOwner(membershipId);
     }
 
     /**
@@ -139,14 +130,8 @@ service cloud.firestore {
      * @principle Enforces document ownership for visit summaries.
      */
     match /memberships/{membershipId}/visitSummaries/{visitSummaryId} {
-      // Read rules: Only the owner can read their own visit summaries.
-      allow get: if isOwner(membershipId);
-      allow list: if isOwner(membershipId);
-
-      // Write rules: Only the owner can create, update, or delete their own visit summaries.
-      allow create: if isOwner(membershipId);
-      allow update: if isExistingOwner(membershipId);
-      allow delete: if isExistingOwner(membershipId);
+      // Read/Write rules: Only the owner can manage their own visit summaries.
+      allow read, write: if isOwner(membershipId);
     }
 
     /**
@@ -159,14 +144,8 @@ service cloud.firestore {
      * @principle Enforces document ownership for transactions.
      */
     match /memberships/{membershipId}/transactions/{transactionId} {
-      // Read rules: Only the owner can read their own transactions.
-      allow get: if isOwner(membershipId);
-      allow list: if isOwner(membershipId);
-
-      // Write rules: Only the owner can create, update, or delete their own transactions.
-      allow create: if isOwner(membershipId);
-      allow update: if isExistingOwner(membershipId);
-      allow delete: if isExistingOwner(membershipId);
+      // Read/Write rules: Only the owner can manage their own transactions.
+      allow read, write: if isOwner(membershipId);
     }
   }
 }
