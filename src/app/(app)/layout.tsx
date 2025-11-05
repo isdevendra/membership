@@ -1,5 +1,6 @@
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { FirebaseClientProvider } from "@/firebase/client-provider";
 
 export default function AppLayout({
   children,
@@ -7,13 +8,15 @@ export default function AppLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <div className="min-h-screen p-4 sm:p-6 lg:p-8">
-            {children}
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+    <FirebaseClientProvider>
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <div className="min-h-screen p-4 sm:p-6 lg:p-8">
+              {children}
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+    </FirebaseClientProvider>
   );
 }

@@ -35,27 +35,44 @@ import {
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { type Member, type MemberTier } from "@/lib/types";
+import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { collection } from "firebase/firestore";
+import { format } from "date-fns";
 
 const tierColors: Record<MemberTier, string> = {
     Bronze: "bg-amber-700",
     Silver: "bg-slate-400",
     Gold: "bg-yellow-500",
     Platinum: "bg-sky-200 text-black",
+    Regular: "bg-gray-500",
+    VIP: "bg-purple-700",
+    Staff: "bg-blue-700",
+    Blacklist: "bg-red-700",
 };
 
-export function MemberTable({ initialMembers }: { initialMembers: Member[] }) {
-  const [members, setMembers] = React.useState(initialMembers);
+export function MemberTable() {
+  const firestore = useFirestore();
+  const membersCollection = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, 'memberships');
+  }, [firestore]);
+
+  const { data: members, isLoading } = useCollection<Member>(membersCollection);
+
   const [searchTerm, setSearchTerm] = React.useState("");
 
   const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
   };
 
-  const filteredMembers = members.filter(
-    (member) =>
-      member.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredMembers = React.useMemo(() => {
+    if (!members) return [];
+    return members.filter(
+      (member) =>
+        member.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        member.id.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [members, searchTerm]);
 
   return (
     <Card>
@@ -97,16 +114,21 @@ export function MemberTable({ initialMembers }: { initialMembers: Member[] }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredMembers.map((member) => (
+            {isLoading && (
+                <TableRow>
+                    <TableCell colSpan={5} className="text-center">Loading members...</TableCell>
+                </TableRow>
+            )}
+            {!isLoading && filteredMembers.map((member) => (
               <TableRow key={member.id}>
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-3">
                     <Avatar>
-                       <AvatarImage src={member.avatarUrl} alt={member.name} />
-                      <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                       <AvatarImage src={member.photo} alt={member.fullName} />
+                      <AvatarFallback>{member.fullName.charAt(0)}</AvatarFallback>
                     </Avatar>
                     <div className="grid gap-0.5">
-                      <span className="font-semibold">{member.name}</span>
+                      <span className="font-semibold">{member.fullName}</span>
                       <span className="text-sm text-muted-foreground">{member.id}</span>
                     </div>
                   </div>
@@ -119,7 +141,7 @@ export function MemberTable({ initialMembers }: { initialMembers: Member[] }) {
                 <TableCell>
                   {member.points.toLocaleString()}
                 </TableCell>
-                <TableCell>{member.joinDate}</TableCell>
+                <TableCell>{format(new Date(member.joinDate), "MM/dd/yyyy")}</TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

@@ -31,6 +31,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useFirestore } from "@/firebase";
+import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { collection } from "firebase/firestore";
 
 
 const formSchema = z.object({
@@ -61,6 +64,7 @@ export function EnrollmentForm() {
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | undefined>(undefined);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const firestore = useFirestore();
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -109,7 +113,13 @@ export function EnrollmentForm() {
   }, [showCamera]);
 
   function onSubmit(values: z.infer<typeof formSchema>) {
-    const finalValues = { ...values, photo };
+    const finalValues = { ...values, photo, joinDate: new Date().toISOString(), tier: values.memberType, points: 0 };
+    
+    if (firestore) {
+      const membersCollection = collection(firestore, 'memberships');
+      addDocumentNonBlocking(membersCollection, finalValues);
+    }
+    
     console.log(finalValues);
     toast({
       title: "Enrollment Successful",
