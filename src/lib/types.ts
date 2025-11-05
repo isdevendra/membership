@@ -8,11 +8,11 @@ export type Member = {
   joinDate: string;
   tier: MemberTier;
   points: number;
-  dob: Date;
+  dob: Date | string;
   gender: string;
   nationality: string;
   governmentId: string;
   phone: string;
   address: string;
-  expiryDate: Date;
+  expiryDate: Date | string;
 };

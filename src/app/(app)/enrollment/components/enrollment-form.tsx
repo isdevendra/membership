@@ -60,7 +60,7 @@ const formSchema = z.object({
   gender: z.string().min(1, "Gender is required."),
   nationality: z.string().min(1, "Nationality is required."),
   governmentId: z.string().min(1, "Government ID is required."),
-  memberType: z.enum(['Regular', 'VIP', 'Staff', 'Blacklist']),
+  memberType: z.enum(['Regular', 'VIP', 'Staff', 'Blacklist', 'Bronze', 'Silver', 'Gold', 'Platinum']),
   expiryDate: z.date({
     required_error: "An expiry date is required.",
   }),
@@ -449,6 +449,10 @@ export function EnrollmentForm() {
                               <SelectItem value="VIP">VIP</SelectItem>
                               <SelectItem value="Staff">Staff</SelectItem>
                               <SelectItem value="Blacklist">Blacklist</SelectItem>
+                              <SelectItem value="Bronze">Bronze</SelectItem>
+                              <SelectItem value="Silver">Silver</SelectItem>
+                              <SelectItem value="Gold">Gold</SelectItem>
+                              <SelectItem value="Platinum">Platinum</SelectItem>
                               </SelectContent>
                           </Select>
                           <FormMessage />

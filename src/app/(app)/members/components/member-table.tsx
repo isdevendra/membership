@@ -5,8 +5,10 @@ import {
   MoreHorizontal,
   PlusCircle,
   Search,
+  Users,
+  CalendarIcon,
+  Crown,
 } from "lucide-react";
-import Image from "next/image";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,6 +26,15 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+  } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -35,9 +46,16 @@ import {
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { type Member, type MemberTier } from "@/lib/types";
-import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
-import { collection } from "firebase/firestore";
+import { useCollection, useFirestore, useMemoFirebase, useUser, updateDocumentNonBlocking } from "@/firebase";
+import { collection, doc } from "firebase/firestore";
 import { format } from "date-fns";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
+
 
 const tierColors: Record<MemberTier, string> = {
     Bronze: "bg-amber-700",
@@ -49,6 +67,113 @@ const tierColors: Record<MemberTier, string> = {
     Staff: "bg-blue-700",
     Blacklist: "bg-red-700",
 };
+
+function ManageMemberDialog({ member, children }: { member: Member, children: React.ReactNode }) {
+    const firestore = useFirestore();
+    const [isOpen, setIsOpen] = React.useState(false);
+    const [tier, setTier] = React.useState<MemberTier>(member.tier);
+    const [expiryDate, setExpiryDate] = React.useState<Date>(member.expiryDate instanceof Date ? member.expiryDate : new Date(member.expiryDate));
+
+    React.useEffect(() => {
+        if (isOpen) {
+            setTier(member.tier);
+            setExpiryDate(member.expiryDate instanceof Date ? member.expiryDate : new Date(member.expiryDate));
+        }
+    }, [isOpen, member]);
+
+    const handleSave = () => {
+        if (!firestore) return;
+        const memberDocRef = doc(firestore, 'memberships', member.id);
+        const updates: Partial<Member> = {};
+
+        if (tier !== member.tier) {
+            updates.tier = tier;
+        }
+        if (expiryDate.toISOString() !== (member.expiryDate instanceof Date ? member.expiryDate.toISOString() : new Date(member.expiryDate).toISOString())) {
+            updates.expiryDate = expiryDate;
+        }
+        
+        if (Object.keys(updates).length > 0) {
+            updateDocumentNonBlocking(memberDocRef, updates);
+            toast({
+                title: "Member Updated",
+                description: `${member.fullName}'s details have been updated.`,
+            });
+        }
+        setIsOpen(false);
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogTrigger asChild>{children}</DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Manage {member.fullName}</DialogTitle>
+            <DialogDescription>
+              Update member tier or renew their membership.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="tier" className="text-right">
+                Tier
+              </Label>
+              <div className="col-span-3">
+                <Select value={tier} onValueChange={(value) => setTier(value as MemberTier)}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Select member type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="Regular">Regular</SelectItem>
+                        <SelectItem value="VIP">VIP</SelectItem>
+                        <SelectItem value="Staff">Staff</SelectItem>
+                        <SelectItem value="Blacklist">Blacklist</SelectItem>
+                        <SelectItem value="Bronze">Bronze</SelectItem>
+                        <SelectItem value="Silver">Silver</SelectItem>
+                        <SelectItem value="Gold">Gold</SelectItem>
+                        <SelectItem value="Platinum">Platinum</SelectItem>
+                    </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="expiryDate" className="text-right">
+                Expiry Date
+              </Label>
+              <div className="col-span-3">
+                 <Popover>
+                    <PopoverTrigger asChild>
+                        <Button
+                        variant={"outline"}
+                        className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !expiryDate && "text-muted-foreground"
+                        )}
+                        >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {expiryDate ? format(expiryDate, "PPP") : <span>Pick a date</span>}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                        <Calendar
+                            mode="single"
+                            selected={expiryDate}
+                            onSelect={(date) => date && setExpiryDate(date)}
+                            initialFocus
+                        />
+                    </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+            <Button onClick={handleSave}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+}
 
 export function MemberTable() {
   const firestore = useFirestore();
@@ -113,6 +238,7 @@ export function MemberTable() {
               <TableHead>Tier</TableHead>
               <TableHead>Points</TableHead>
               <TableHead>Join Date</TableHead>
+              <TableHead>Expiry Date</TableHead>
               <TableHead>
                 <span className="sr-only">Actions</span>
               </TableHead>
@@ -121,7 +247,7 @@ export function MemberTable() {
           <TableBody>
             {isLoading && (
                 <TableRow>
-                    <TableCell colSpan={5} className="text-center">Loading members...</TableCell>
+                    <TableCell colSpan={6} className="text-center">Loading members...</TableCell>
                 </TableRow>
             )}
             {!isLoading && filteredMembers.map((member) => (
@@ -147,21 +273,26 @@ export function MemberTable() {
                   {member.points.toLocaleString()}
                 </TableCell>
                 <TableCell>{format(new Date(member.joinDate), "MM/dd/yyyy")}</TableCell>
+                <TableCell>{format(new Date(member.expiryDate), "MM/dd/yyyy")}</TableCell>
                 <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button aria-haspopup="true" size="icon" variant="ghost">
-                        <MoreHorizontal className="h-4 w-4" />
-                        <span className="sr-only">Toggle menu</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem>View Details</DropdownMenuItem>
-                      <DropdownMenuItem>Update Tier</DropdownMenuItem>
-                      <DropdownMenuItem>Redeem Rewards</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <ManageMemberDialog member={member}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button aria-haspopup="true" size="icon" variant="ghost">
+                          <MoreHorizontal className="h-4 w-4" />
+                          <span className="sr-only">Toggle menu</span>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem>View Details</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                            <DialogTrigger className="w-full text-left">Manage Membership</DialogTrigger>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>Redeem Rewards</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </ManageMemberDialog>
                 </TableCell>
               </TableRow>
             ))}
