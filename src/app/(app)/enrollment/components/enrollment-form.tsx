@@ -408,6 +408,9 @@ export function EnrollmentForm() {
                                 onSelect={field.onChange}
                                 disabled={(date) => date < new Date()}
                                 initialFocus
+                                captionLayout="dropdown-buttons"
+                                fromYear={new Date().getFullYear()}
+                                toYear={new Date().getFullYear() + 10}
                             />
                             </PopoverContent>
                         </Popover>
@@ -452,5 +455,3 @@ export function EnrollmentForm() {
     </Card>
   );
 }
-
-    
