@@ -265,6 +265,9 @@ export function EnrollmentForm() {
                                 date > new Date() || date < new Date("1900-01-01")
                                 }
                                 initialFocus
+                                captionLayout="dropdown-buttons"
+                                fromYear={new Date().getFullYear() - 100}
+                                toYear={new Date().getFullYear()}
                             />
                             </PopoverContent>
                         </Popover>
@@ -449,3 +452,5 @@ export function EnrollmentForm() {
     </Card>
   );
 }
+
+    
