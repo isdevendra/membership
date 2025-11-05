@@ -35,7 +35,7 @@ import {
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { type Member, type MemberTier } from "@/lib/types";
-import { useCollection, useFirestore, useMemoFirebase } from "@/firebase";
+import { useCollection, useFirestore, useMemoFirebase, useUser } from "@/firebase";
 import { collection } from "firebase/firestore";
 import { format } from "date-fns";
 
@@ -52,25 +52,30 @@ const tierColors: Record<MemberTier, string> = {
 
 export function MemberTable() {
   const firestore = useFirestore();
-  const membersCollection = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return collection(firestore, 'memberships');
-  }, [firestore]);
+  const { user, isUserLoading } = useUser();
 
-  const { data: members, isLoading } = useCollection<Member>(membersCollection);
+  const membersCollection = useMemoFirebase(() => {
+    // Wait until we have a user to create the query
+    if (!firestore || !user) return null;
+    return collection(firestore, 'memberships');
+  }, [firestore, user]);
+
+  const { data: members, isLoading: isLoadingMembers } = useCollection<Member>(membersCollection);
 
   const [searchTerm, setSearchTerm] = React.useState("");
 
   const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(event.target.value);
   };
+  
+  const isLoading = isUserLoading || isLoadingMembers;
 
   const filteredMembers = React.useMemo(() => {
     if (!members) return [];
     return members.filter(
       (member) =>
         member.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        member.id.toLowerCase().includes(searchTerm.toLowerCase())
+        (member.id && member.id.toLowerCase().includes(searchTerm.toLowerCase()))
     );
   }, [members, searchTerm]);
 
