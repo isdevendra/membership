@@ -47,7 +47,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { type Member, type MemberTier } from "@/lib/types";
 import { useCollection, useFirestore, useMemoFirebase, useUser, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc } from "firebase/firestore";
+import { collection, doc, Timestamp } from "firebase/firestore";
 import { format } from "date-fns";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -68,16 +68,40 @@ const tierColors: Record<MemberTier, string> = {
     Blacklist: "bg-red-700",
 };
 
+// Helper to convert Firestore Timestamp or string to Date
+const toDate = (dateValue: any): Date | null => {
+    if (!dateValue) return null;
+    if (dateValue instanceof Timestamp) {
+      return dateValue.toDate();
+    }
+    if (typeof dateValue === 'string' || typeof dateValue === 'number') {
+      const date = new Date(dateValue);
+      if (!isNaN(date.getTime())) {
+        return date;
+      }
+    }
+    // Handle cases where date is already a JS Date object from form state
+    if (dateValue instanceof Date) {
+        return dateValue;
+    }
+    // Handle Firestore's seconds/nanoseconds object representation after serialization
+    if (typeof dateValue === 'object' && 'seconds' in dateValue && 'nanoseconds' in dateValue) {
+        return new Timestamp(dateValue.seconds, dateValue.nanoseconds).toDate();
+    }
+    return null;
+};
+  
+
 function ManageMemberDialog({ member, children }: { member: Member, children: React.ReactNode }) {
     const firestore = useFirestore();
     const [isOpen, setIsOpen] = React.useState(false);
     const [tier, setTier] = React.useState<MemberTier>(member.tier);
-    const [expiryDate, setExpiryDate] = React.useState<Date>(member.expiryDate instanceof Date ? member.expiryDate : new Date(member.expiryDate));
+    const [expiryDate, setExpiryDate] = React.useState<Date | undefined>(toDate(member.expiryDate) ?? undefined);
 
     React.useEffect(() => {
         if (isOpen) {
             setTier(member.tier);
-            setExpiryDate(member.expiryDate instanceof Date ? member.expiryDate : new Date(member.expiryDate));
+            setExpiryDate(toDate(member.expiryDate) ?? undefined);
         }
     }, [isOpen, member]);
 
@@ -86,11 +110,15 @@ function ManageMemberDialog({ member, children }: { member: Member, children: Re
         const memberDocRef = doc(firestore, 'memberships', member.id);
         const updates: Partial<Member> = {};
 
+        const originalExpiryDate = toDate(member.expiryDate);
+
         if (tier !== member.tier) {
             updates.tier = tier;
         }
-        if (expiryDate.toISOString() !== (member.expiryDate instanceof Date ? member.expiryDate.toISOString() : new Date(member.expiryDate).toISOString())) {
-            updates.expiryDate = expiryDate;
+
+        // Check if expiryDate has changed
+        if (expiryDate && expiryDate.getTime() !== originalExpiryDate?.getTime()) {
+             updates.expiryDate = expiryDate;
         }
         
         if (Object.keys(updates).length > 0) {
@@ -250,7 +278,11 @@ export function MemberTable() {
                     <TableCell colSpan={6} className="text-center">Loading members...</TableCell>
                 </TableRow>
             )}
-            {!isLoading && filteredMembers.map((member) => (
+            {!isLoading && filteredMembers.map((member) => {
+              const joinDate = toDate(member.joinDate);
+              const expiryDate = toDate(member.expiryDate);
+              
+              return (
               <TableRow key={member.id}>
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-3">
@@ -272,8 +304,8 @@ export function MemberTable() {
                 <TableCell>
                   {member.points.toLocaleString()}
                 </TableCell>
-                <TableCell>{format(new Date(member.joinDate), "MM/dd/yyyy")}</TableCell>
-                <TableCell>{format(new Date(member.expiryDate), "MM/dd/yyyy")}</TableCell>
+                <TableCell>{joinDate ? format(joinDate, "MM/dd/yyyy") : 'N/A'}</TableCell>
+                <TableCell>{expiryDate ? format(expiryDate, "MM/dd/yyyy") : 'N/A'}</TableCell>
                 <TableCell>
                   <ManageMemberDialog member={member}>
                     <DropdownMenu>
@@ -295,7 +327,7 @@ export function MemberTable() {
                   </ManageMemberDialog>
                 </TableCell>
               </TableRow>
-            ))}
+            )})}
           </TableBody>
         </Table>
       </CardContent>
