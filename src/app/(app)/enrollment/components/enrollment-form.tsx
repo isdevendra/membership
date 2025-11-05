@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -43,6 +44,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import Link from "next/link";
 
 
 const formSchema = z.object({
@@ -75,7 +77,7 @@ export function EnrollmentForm() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const firestore = useFirestore();
   const [enrollmentSuccess, setEnrollmentSuccess] = useState(false);
-  const [newMemberId, setNewMemberId] = useState("");
+  const [newMember, setNewMember] = useState<{id: string, name: string} | null>(null);
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -130,7 +132,7 @@ export function EnrollmentForm() {
       const membersCollection = collection(firestore, 'memberships');
       const docRef = await addDocumentNonBlocking(membersCollection, finalValues);
       if (docRef) {
-        setNewMemberId(docRef.id);
+        setNewMember({ id: docRef.id, name: values.fullName });
         setEnrollmentSuccess(true);
         toast({
           title: "Enrollment Successful",
@@ -169,6 +171,9 @@ export function EnrollmentForm() {
       }
     }
   };
+  
+  const profileUrl = newMember ? `${window.location.origin}/members/${newMember.id}` : '';
+
 
   return (
     <>
@@ -476,18 +481,25 @@ export function EnrollmentForm() {
           <DialogHeader>
             <DialogTitle>Enrollment Successful!</DialogTitle>
             <DialogDescription>
-              The new member has been added to the system.
+              {newMember?.name} has been added to the system.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col items-center justify-center p-4 space-y-4">
-            <p className="font-mono text-center text-lg bg-muted p-2 rounded-md">{newMemberId}</p>
-            <div className="bg-white p-4 rounded-md">
-              <QRCode value={newMemberId} size={200} />
+          {newMember && (
+            <div className="flex flex-col items-center justify-center p-4 space-y-4">
+              <p className="font-mono text-center text-lg bg-muted p-2 rounded-md">{newMember.id}</p>
+              <div className="bg-white p-4 rounded-md">
+                <QRCode value={profileUrl} size={200} />
+              </div>
+              <p className="text-sm text-muted-foreground text-center">This QR code links to the member's new profile page.</p>
             </div>
-            <p className="text-sm text-muted-foreground text-center">Scan this QR code to look up the member.</p>
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setEnrollmentSuccess(false)}>Close</Button>
+          )}
+          <DialogFooter className="sm:justify-between gap-2">
+            <Button variant="secondary" onClick={() => setEnrollmentSuccess(false)}>Close</Button>
+            {newMember && (
+                <Button asChild>
+                    <Link href={`/members/${newMember.id}`}>View Profile</Link>
+                </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

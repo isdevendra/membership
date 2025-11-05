@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -55,6 +56,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import Link from "next/link";
 
 
 const tierColors: Record<MemberTier, string> = {
@@ -250,11 +252,13 @@ export function MemberTable() {
               onChange={handleSearch}
             />
           </div>
-          <Button size="sm" className="gap-1">
-            <PlusCircle className="h-3.5 w-3.5" />
-            <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-              Add Member
-            </span>
+          <Button size="sm" className="gap-1" asChild>
+            <Link href="/enrollment">
+                <PlusCircle className="h-3.5 w-3.5" />
+                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                Add Member
+                </span>
+            </Link>
           </Button>
         </div>
       </CardHeader>
@@ -276,6 +280,11 @@ export function MemberTable() {
             {isLoading && (
                 <TableRow>
                     <TableCell colSpan={6} className="text-center">Loading members...</TableCell>
+                </TableRow>
+            )}
+            {!isLoading && filteredMembers.length === 0 && (
+                <TableRow>
+                    <TableCell colSpan={6} className="text-center">No members found.</TableCell>
                 </TableRow>
             )}
             {!isLoading && filteredMembers.map((member) => {
@@ -317,7 +326,9 @@ export function MemberTable() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem>View Details</DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                            <Link href={`/members/${member.id}`}>View Profile</Link>
+                        </DropdownMenuItem>
                         <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
                             <DialogTrigger className="w-full text-left">Manage Membership</DialogTrigger>
                         </DropdownMenuItem>
