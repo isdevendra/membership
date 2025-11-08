@@ -2,6 +2,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AuthProvider } from "@/firebase/auth-provider";
 import { FirebaseClientProvider } from "@/firebase/client-provider";
+import { SettingsProvider } from "@/context/settings-context";
 
 export default function AppLayout({
   children,
@@ -11,14 +12,16 @@ export default function AppLayout({
   return (
     <FirebaseClientProvider>
       <AuthProvider>
-        <SidebarProvider>
-          <AppSidebar />
-          <SidebarInset>
-            <div className="min-h-screen p-4 sm:p-6 lg:p-8">
-                {children}
-            </div>
-          </SidebarInset>
-        </SidebarProvider>
+        <SettingsProvider>
+            <SidebarProvider>
+            <AppSidebar />
+            <SidebarInset>
+                <div className="min-h-screen p-4 sm:p-6 lg:p-8">
+                    {children}
+                </div>
+            </SidebarInset>
+            </SidebarProvider>
+        </SettingsProvider>
       </AuthProvider>
     </FirebaseClientProvider>
   );

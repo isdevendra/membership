@@ -10,6 +10,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Logo } from '@/components/icons';
 import { type Member } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { useSettings } from '@/context/settings-context';
+import Image from 'next/image';
 
 interface MembershipCardProps {
   member: Member;
@@ -34,7 +36,8 @@ const toDate = (dateValue: any): Date | null => {
 
 export function MembershipCard({ member }: MembershipCardProps) {
   const cardRef = React.useRef<HTMLDivElement>(null);
-  const profileUrl = `${window.location.origin}/members/${member.id}`;
+  const { settings } = useSettings();
+  const profileUrl = typeof window !== 'undefined' ? `${window.location.origin}/members/${member.id}` : '';
 
   const handlePrint = () => {
     const printWindow = window.open('', '', 'height=600,width=800');
@@ -77,6 +80,7 @@ export function MembershipCard({ member }: MembershipCardProps) {
   };
 
   const expiryDate = toDate(member.expiryDate);
+  const joinDate = toDate(member.joinDate);
 
   return (
     <div>
@@ -86,8 +90,12 @@ export function MembershipCard({ member }: MembershipCardProps) {
         )}>
             <div className="flex justify-between items-start">
                 <div className="flex items-center gap-2">
-                    <Logo className="size-8" />
-                    <span className="text-lg font-bold font-headline">Casino Royale</span>
+                    {settings.logoUrl ? (
+                        <Image src={settings.logoUrl} alt={settings.casinoName} width={32} height={32} className="rounded-sm"/>
+                    ) : (
+                        <Logo className="size-8" />
+                    )}
+                    <span className="text-lg font-bold font-headline">{settings.casinoName}</span>
                 </div>
                 <div className="text-right">
                     <p className="font-bold text-lg leading-tight">{member.tier}</p>
@@ -106,14 +114,14 @@ export function MembershipCard({ member }: MembershipCardProps) {
                     <p className="font-mono text-sm opacity-80">{member.id}</p>
                 </div>
                 <div className="bg-white p-1 rounded-md">
-                    <QRCode value={profileUrl} size={50} />
+                    {profileUrl && <QRCode value={profileUrl} size={50} />}
                 </div>
             </div>
 
             <div className="flex justify-between items-end text-xs font-mono">
                 <div>
                     <p>Member Since</p>
-                    <p>{format(new Date(), "MM/yy")}</p>
+                    <p>{joinDate ? format(joinDate, "MM/yy") : 'N/A'}</p>
                 </div>
                 <div className="text-right">
                     <p>Expires</p>

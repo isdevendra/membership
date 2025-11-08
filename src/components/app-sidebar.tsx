@@ -8,6 +8,7 @@ import {
   UserPlus,
   Users,
   Award,
+  Settings,
 } from "lucide-react";
 
 import {
@@ -46,6 +47,11 @@ const menuItems = [
     href: "/profiler",
     icon: BrainCircuit,
     label: "Patron Profiler",
+  },
+  {
+    href: "/settings",
+    icon: Settings,
+    label: "Settings",
   },
 ];
 
