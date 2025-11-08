@@ -13,6 +13,7 @@ import {
   FileText,
   KeyRound,
   LogOut,
+  LogIn,
 } from "lucide-react";
 
 import {
@@ -48,7 +49,12 @@ const menuItems = [
     icon: UserPlus,
     label: "Enrollment",
   },
-    {
+  {
+    href: "/check-in",
+    icon: LogIn,
+    label: "Check-in",
+  },
+  {
     href: "/rewards",
     icon: Award,
     label: "Rewards",
@@ -132,3 +138,5 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+
+    

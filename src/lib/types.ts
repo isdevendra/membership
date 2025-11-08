@@ -1,4 +1,7 @@
+
 export type MemberTier = 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Regular' | 'VIP' | 'Staff' | 'Blacklist';
+
+export type MemberStatus = 'Checked In' | 'Checked Out';
 
 export type Member = {
   id: string;
@@ -17,6 +20,14 @@ export type Member = {
   expiryDate: Date | string;
   idFront?: string;
   idBack?: string;
+  status?: MemberStatus;
 };
+
+export type CheckIn = {
+    id: string;
+    memberId: string;
+    checkInTime: string; // ISO string
+    checkOutTime?: string; // ISO string
+}
 
     

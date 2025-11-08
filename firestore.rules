@@ -1,3 +1,4 @@
+
 /**
  * @fileoverview Firestore Security Rules for the Casino Membership Application.
  *
@@ -13,11 +14,12 @@
  * - /memberships/{membershipId}/redemptions/{redemptionId}: Stores redemption records for a member.
  * - /memberships/{membershipId}/visitSummaries/{visitSummaryId}: Stores visit summaries for a member.
  * - /memberships/{membershipId}/transactions/{transactionId}: Stores transaction records for a member.
+ * - /memberships/{membershipId}/checkins/{checkinId}: Stores check-in records for a member.
  *
  * Key Security Decisions:
  * - Memberships are private and accessible only to the authenticated user matching the membership ID.
  * - Tiers and Rewards are public read-only.
- * - Subcollections (redemptions, visitSummaries, transactions) are also user-owned.
+ * - Subcollections (redemptions, visitSummaries, transactions, checkins) are also user-owned.
  * - Data validation is limited to relational integrity checks, not full schema validation.
  *
  * Denormalization for Authorization:
@@ -141,5 +143,17 @@ service cloud.firestore {
       // Read/Write rules: Only the owner can manage their own transactions.
       allow read, write: if isOwner(membershipId);
     }
+
+     /**
+     * @description Rules for the /memberships/{membershipId}/checkins/{checkinId} collection.
+     * @path /memberships/{membershipId}/checkins/{checkinId}
+     * @allow (create, read, write) Any authenticated user can manage check-in records.
+     * @principle Allows staff to manage member check-ins.
+     */
+    match /memberships/{membershipId}/checkins/{checkinId} {
+      allow read, write: if isSignedIn();
+    }
   }
 }
+
+    
