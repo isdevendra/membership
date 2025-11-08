@@ -1,6 +1,6 @@
 'use client';
 
-import { Award, CalendarPlus, Users, Gem, BarChart } from 'lucide-react';
+import { Award, CalendarPlus, Users, Gem } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MembershipChart } from './components/membership-chart';
@@ -10,6 +10,8 @@ import { collection } from 'firebase/firestore';
 import type { Member } from '@/lib/types';
 import { useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TopSpenders } from './components/top-spenders';
+import { FrequentVisitors } from './components/frequent-visitors';
 
 export default function DashboardPage() {
   const firestore = useFirestore();
@@ -104,6 +106,10 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+        <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <Skeleton className="h-[480px] w-full" />
+          <Skeleton className="h-[480px] w-full" />
+        </div>
       </div>
     );
   }
@@ -163,6 +169,10 @@ export default function DashboardPage() {
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <MembershipChart />
         <TierDistributionChart members={members ?? []} />
+      </div>
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <TopSpenders />
+        <FrequentVisitors />
       </div>
     </div>
   );
