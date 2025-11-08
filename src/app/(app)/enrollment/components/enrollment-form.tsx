@@ -217,7 +217,7 @@ export function EnrollmentForm() {
                         <FormControl>
                           <div className="flex flex-col items-center gap-4">
                             <Avatar className="w-40 h-40 border">
-                              <AvatarImage src={photo || ''} alt="Member photo" />
+                              <AvatarImage src={photo || undefined} alt="Member photo" />
                               <AvatarFallback className="text-3xl">?</AvatarFallback>
                             </Avatar>
                               {showCamera ? (
@@ -575,5 +575,3 @@ export function EnrollmentForm() {
     </>
   );
 }
-
-    
