@@ -9,7 +9,9 @@ import {
   Users,
   CalendarIcon,
   Crown,
+  X,
 } from "lucide-react";
+import { DateRange } from "react-day-picker";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -210,7 +212,6 @@ export function MemberTable() {
   const { user, isUserLoading } = useUser();
 
   const membersCollection = useMemoFirebase(() => {
-    // Wait until we have a user to create the query
     if (!firestore || !user) return null;
     return collection(firestore, 'memberships');
   }, [firestore, user]);
@@ -218,21 +219,39 @@ export function MemberTable() {
   const { data: members, isLoading: isLoadingMembers } = useCollection<Member>(membersCollection);
 
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [tierFilter, setTierFilter] = React.useState<MemberTier | "all">("all");
+  const [dateRange, setDateRange] = React.useState<DateRange | undefined>(undefined);
 
-  const handleSearch = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(event.target.value);
-  };
-  
   const isLoading = isUserLoading || isLoadingMembers;
 
   const filteredMembers = React.useMemo(() => {
     if (!members) return [];
-    return members.filter(
-      (member) =>
+    
+    return members.filter((member) => {
+      // Search term filter
+      const matchesSearch =
         member.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (member.id && member.id.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-  }, [members, searchTerm]);
+        (member.id && member.id.toLowerCase().includes(searchTerm.toLowerCase()));
+
+      // Tier filter
+      const matchesTier = tierFilter === 'all' || member.tier === tierFilter;
+
+      // Date range filter
+      const joinDate = toDate(member.joinDate);
+      const matchesDate = !dateRange || (joinDate &&
+        (!dateRange.from || joinDate >= dateRange.from) &&
+        (!dateRange.to || joinDate <= dateRange.to));
+
+      return matchesSearch && matchesTier && matchesDate;
+    });
+  }, [members, searchTerm, tierFilter, dateRange]);
+  
+  const isFiltered = tierFilter !== 'all' || dateRange !== undefined;
+
+  const clearFilters = () => {
+    setTierFilter('all');
+    setDateRange(undefined);
+  }
 
   return (
     <Card>
@@ -241,25 +260,86 @@ export function MemberTable() {
         <CardDescription>
           A list of all members in the casino.
         </CardDescription>
-        <div className="flex items-center gap-2 pt-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search by name or ID..."
-              className="pl-8"
-              value={searchTerm}
-              onChange={handleSearch}
-            />
-          </div>
-          <Button size="sm" className="gap-1" asChild>
-            <Link href="/enrollment">
-                <PlusCircle className="h-3.5 w-3.5" />
-                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                Add Member
-                </span>
-            </Link>
-          </Button>
+        <div className="flex flex-col gap-4 pt-4 md:flex-row md:items-center">
+            <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                type="search"
+                placeholder="Search by name or ID..."
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                />
+            </div>
+            <div className="flex gap-2 flex-wrap">
+                <Select value={tierFilter} onValueChange={(value) => setTierFilter(value as MemberTier | "all")}>
+                    <SelectTrigger className="w-full sm:w-[180px]">
+                        <SelectValue placeholder="Filter by tier" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Tiers</SelectItem>
+                        <SelectItem value="Regular">Regular</SelectItem>
+                        <SelectItem value="VIP">VIP</SelectItem>
+                        <SelectItem value="Staff">Staff</SelectItem>
+                        <SelectItem value="Blacklist">Blacklist</SelectItem>
+                        <SelectItem value="Bronze">Bronze</SelectItem>
+                        <SelectItem value="Silver">Silver</SelectItem>
+                        <SelectItem value="Gold">Gold</SelectItem>
+                        <SelectItem value="Platinum">Platinum</SelectItem>
+                    </SelectContent>
+                </Select>
+
+                <Popover>
+                    <PopoverTrigger asChild>
+                    <Button
+                        id="date"
+                        variant={"outline"}
+                        className={cn(
+                        "w-full justify-start text-left font-normal sm:w-[240px]",
+                        !dateRange && "text-muted-foreground"
+                        )}
+                    >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dateRange?.from ? (
+                        dateRange.to ? (
+                            <>
+                            {format(dateRange.from, "LLL dd, y")} -{" "}
+                            {format(dateRange.to, "LLL dd, y")}
+                            </>
+                        ) : (
+                            format(dateRange.from, "LLL dd, y")
+                        )
+                        ) : (
+                        <span>Filter by join date</span>
+                        )}
+                    </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={dateRange?.from}
+                        selected={dateRange}
+                        onSelect={setDateRange}
+                        numberOfMonths={2}
+                    />
+                    </PopoverContent>
+                </Popover>
+
+                {isFiltered && (
+                    <Button variant="ghost" onClick={clearFilters}>
+                        <X className="mr-2 h-4 w-4" /> Clear
+                    </Button>
+                )}
+                 <Button size="sm" className="gap-1" asChild>
+                    <Link href="/enrollment">
+                        <PlusCircle className="h-3.5 w-3.5" />
+                        <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                        Add Member
+                        </span>
+                    </Link>
+                </Button>
+            </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -284,7 +364,12 @@ export function MemberTable() {
             )}
             {!isLoading && filteredMembers.length === 0 && (
                 <TableRow>
-                    <TableCell colSpan={6} className="text-center">No members found.</TableCell>
+                    <TableCell colSpan={6} className="h-24 text-center">
+                        <p className="font-semibold">No members found</p>
+                        <p className="text-muted-foreground text-sm">
+                            Try adjusting your search or filter criteria.
+                        </p>
+                    </TableCell>
                 </TableRow>
             )}
             {!isLoading && filteredMembers.map((member) => {
