@@ -10,6 +10,10 @@ import {
   CalendarIcon,
   Crown,
   X,
+  LogIn,
+  LogOut,
+  Ban,
+  CheckCircle2,
 } from "lucide-react";
 import { DateRange } from "react-day-picker";
 
@@ -28,6 +32,7 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
     Dialog,
@@ -49,8 +54,8 @@ import {
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { type Member, type MemberTier } from "@/lib/types";
-import { useCollection, useFirestore, useMemoFirebase, useUser, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, Timestamp } from "firebase/firestore";
+import { useCollection, useFirestore, useMemoFirebase, useUser, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
+import { collection, doc, Timestamp, query, orderBy, limit } from "firebase/firestore";
 import { format } from "date-fns";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -216,7 +221,7 @@ export function MemberTable() {
     return collection(firestore, 'memberships');
   }, [firestore, user]);
 
-  const { data: members, isLoading: isLoadingMembers } = useCollection<Member>(membersCollection);
+  const { data: members, isLoading: isLoadingMembers, error } = useCollection<Member>(membersCollection);
 
   const [searchTerm, setSearchTerm] = React.useState("");
   const [tierFilter, setTierFilter] = React.useState<MemberTier | "all">("all");
@@ -252,6 +257,58 @@ export function MemberTable() {
     setTierFilter('all');
     setDateRange(undefined);
   }
+
+  const handleCheckIn = (member: Member) => {
+    if (!firestore) return;
+    const memberDocRef = doc(firestore, 'memberships', member.id);
+    const checkinColRef = collection(firestore, 'memberships', member.id, 'checkins');
+    const newStatus = 'Checked In';
+    
+    updateDocumentNonBlocking(memberDocRef, { status: newStatus });
+    addDocumentNonBlocking(checkinColRef, {
+        memberId: member.id,
+        checkInTime: new Date().toISOString(),
+    });
+    toast({ title: 'Check-in Successful', description: `${member.fullName} has been checked in.` });
+  };
+  
+  const handleCheckOut = async (member: Member) => {
+    if (!firestore) return;
+
+    const memberDocRef = doc(firestore, 'memberships', member.id);
+    const newStatus = 'Checked Out';
+    
+    // Find the latest check-in to update
+    const checkInsQuery = query(collection(firestore, 'memberships', member.id, 'checkins'), orderBy('checkInTime', 'desc'), limit(1));
+    // Since we are not using useCollection, we need to get the documents manually
+    // This is a one-time read, which is fine for a user action.
+    const getDocs = await import('firebase/firestore').then(m => m.getDocs);
+    const snapshot = await getDocs(checkInsQuery);
+    const latestCheckIn = snapshot.docs.find(d => !(d.data() as any).checkOutTime);
+    
+    if (latestCheckIn) {
+        const checkinDocRef = doc(firestore, 'memberships', member.id, 'checkins', latestCheckIn.id);
+        updateDocumentNonBlocking(checkinDocRef, { checkOutTime: new Date().toISOString() });
+    }
+
+    updateDocumentNonBlocking(memberDocRef, { status: newStatus });
+    toast({ title: 'Check-out Successful', description: `${member.fullName} has been checked out.` });
+  };
+
+  const handleBlock = (member: Member) => {
+    if (!firestore) return;
+    const memberDocRef = doc(firestore, 'memberships', member.id);
+    updateDocumentNonBlocking(memberDocRef, { tier: 'Blacklist' });
+    toast({ title: 'Member Blocked', description: `${member.fullName} has been moved to the blacklist.` });
+  };
+
+  const handleUnblock = (member: Member) => {
+    if (!firestore) return;
+    const memberDocRef = doc(firestore, 'memberships', member.id);
+    updateDocumentNonBlocking(memberDocRef, { tier: 'Regular' });
+    toast({ title: 'Member Unblocked', description: `${member.fullName} has been unblocked.` });
+  };
+
 
   return (
     <Card>
@@ -348,6 +405,7 @@ export function MemberTable() {
             <TableRow>
               <TableHead>Member</TableHead>
               <TableHead>Tier</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead>Points</TableHead>
               <TableHead>Join Date</TableHead>
               <TableHead>Expiry Date</TableHead>
@@ -359,12 +417,19 @@ export function MemberTable() {
           <TableBody>
             {isLoading && (
                 <TableRow>
-                    <TableCell colSpan={6} className="text-center">Loading members...</TableCell>
+                    <TableCell colSpan={7} className="text-center">Loading members...</TableCell>
                 </TableRow>
             )}
-            {!isLoading && filteredMembers.length === 0 && (
+            {!isLoading && error && (
                 <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
+                    <TableCell colSpan={7} className="text-center text-destructive">
+                        Error loading members: {error.message}
+                    </TableCell>
+                </TableRow>
+            )}
+            {!isLoading && !error && filteredMembers.length === 0 && (
+                <TableRow>
+                    <TableCell colSpan={7} className="h-24 text-center">
                         <p className="font-semibold">No members found</p>
                         <p className="text-muted-foreground text-sm">
                             Try adjusting your search or filter criteria.
@@ -372,7 +437,7 @@ export function MemberTable() {
                     </TableCell>
                 </TableRow>
             )}
-            {!isLoading && filteredMembers.map((member) => {
+            {!isLoading && !error && filteredMembers.map((member) => {
               const joinDate = toDate(member.joinDate);
               const expiryDate = toDate(member.expiryDate);
               
@@ -394,6 +459,11 @@ export function MemberTable() {
                   <Badge variant="secondary" className={`text-white ${tierColors[member.tier]}`}>
                     {member.tier}
                   </Badge>
+                </TableCell>
+                 <TableCell>
+                    <Badge variant={member.status === 'Checked In' ? 'default' : 'secondary'} className={member.status === 'Checked In' ? 'bg-green-500 text-white' : ''}>
+                        {member.status || 'Checked Out'}
+                    </Badge>
                 </TableCell>
                 <TableCell>
                   {member.points.toLocaleString()}
@@ -418,6 +488,27 @@ export function MemberTable() {
                             <DialogTrigger className="w-full text-left">Manage Membership</DialogTrigger>
                         </DropdownMenuItem>
                         <DropdownMenuItem>Redeem Rewards</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleCheckIn(member)} disabled={member.status === 'Checked In'}>
+                            <LogIn className="mr-2 h-4 w-4" />
+                            Check In
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleCheckOut(member)} disabled={member.status !== 'Checked In'}>
+                            <LogOut className="mr-2 h-4 w-4" />
+                            Check Out
+                        </DropdownMenuItem>
+                         <DropdownMenuSeparator />
+                        {member.tier === 'Blacklist' ? (
+                            <DropdownMenuItem onClick={() => handleUnblock(member)}>
+                                <CheckCircle2 className="mr-2 h-4 w-4" />
+                                Unblock Member
+                            </DropdownMenuItem>
+                        ) : (
+                             <DropdownMenuItem onClick={() => handleBlock(member)} className="text-red-600 focus:text-red-600">
+                                <Ban className="mr-2 h-4 w-4" />
+                                Block Member
+                            </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </ManageMemberDialog>
@@ -430,3 +521,5 @@ export function MemberTable() {
     </Card>
   );
 }
+
+  
