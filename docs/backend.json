@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "Membership": {
@@ -105,13 +106,18 @@
         "pointsCost": {
           "type": "number",
           "description": "The points required to redeem this reward."
+        },
+        "category": {
+            "type": "string",
+            "description": "The category of the reward (e.g., 'Dining', 'Gaming')."
         }
       },
       "required": [
         "id",
         "name",
         "description",
-        "pointsCost"
+        "pointsCost",
+        "category"
       ]
     },
     "Redemption": {
@@ -137,13 +143,23 @@
           "type": "string",
           "description": "The date the reward was redeemed.",
           "format": "date-time"
+        },
+        "rewardName": {
+            "type": "string",
+            "description": "The name of the redeemed reward."
+        },
+        "pointsCost": {
+            "type": "number",
+            "description": "The points cost of the redeemed reward."
         }
       },
       "required": [
         "id",
         "memberId",
         "rewardId",
-        "redemptionDate"
+        "redemptionDate",
+        "rewardName",
+        "pointsCost"
       ]
     },
     "VisitSummary": {
