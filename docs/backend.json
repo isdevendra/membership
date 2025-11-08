@@ -9,8 +9,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the membership.",
-          "format": "uuid"
+          "description": "Unique, numeric identifier for the membership."
         },
         "firstName": {
           "type": "string",
@@ -415,5 +414,3 @@
     "reasoning": "The Firestore data structure is designed to manage casino membership data, tiers, rewards, redemptions, visit summaries, and transactions. The structure prioritizes Authorization Independence and supports the required QAPs by using structural segregation and the membership map pattern. Specifically, access to `memberships` collection is restricted, while access to `tiers` and `rewards` collection are public read-only. Redemptions, Visit Summaries, and Transactions are stored under each member's document. The memberships collection contains all the casino members. Denormalization is used to make security rules simple and robust. Path-based ownership is utilized for user-owned data."
   }
 }
-
-    

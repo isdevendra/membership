@@ -34,8 +34,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useFirestore } from "@/firebase";
-import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
-import { collection } from "firebase/firestore";
+import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { collection, doc } from "firebase/firestore";
 import {
   Dialog,
   DialogContent,
@@ -133,23 +133,43 @@ export function EnrollmentForm() {
   }, [showCamera]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    const finalValues = { ...values, photo, idFront, idBack, joinDate: new Date().toISOString(), tier: values.memberType, points: 0 };
+    if (!firestore) {
+        toast({ title: "Error", description: "Firestore not available."});
+        return;
+    }
+
+    const newId = Date.now().toString();
+    const finalValues = { 
+        ...values, 
+        id: newId, 
+        photo, 
+        idFront, 
+        idBack, 
+        joinDate: new Date().toISOString(), 
+        tier: values.memberType, 
+        points: 0 
+    };
     
-    if (firestore) {
-      const membersCollection = collection(firestore, 'memberships');
-      const docRef = await addDocumentNonBlocking(membersCollection, finalValues);
-      if (docRef) {
-        setNewMember({ id: docRef.id, name: values.fullName });
+    try {
+        const memberDocRef = doc(firestore, 'memberships', newId);
+        setDocumentNonBlocking(memberDocRef, finalValues, {});
+        
+        setNewMember({ id: newId, name: values.fullName });
         setEnrollmentSuccess(true);
         toast({
-          title: "Enrollment Successful",
-          description: `${values.fullName} has been enrolled as a new member.`,
+            title: "Enrollment Successful",
+            description: `${values.fullName} has been enrolled as a new member.`,
         });
         form.reset();
         setPhoto(null);
         setIdFront(null);
         setIdBack(null);
-      }
+    } catch (error) {
+        toast({
+            variant: "destructive",
+            title: "Enrollment Failed",
+            description: "Could not save the new member to the database.",
+        });
     }
   }
 
@@ -564,5 +584,3 @@ export function EnrollmentForm() {
     </>
   );
 }
-
-    
