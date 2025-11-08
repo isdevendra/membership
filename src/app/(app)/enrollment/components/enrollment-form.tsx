@@ -45,6 +45,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import Link from "next/link";
+import Image from "next/image";
 
 
 const formSchema = z.object({
@@ -67,10 +68,14 @@ const formSchema = z.object({
     required_error: "An expiry date is required.",
   }),
   photo: z.string().optional(),
+  idFront: z.string().optional(),
+  idBack: z.string().optional(),
 });
 
 export function EnrollmentForm() {
   const [photo, setPhoto] = useState<string | null>(null);
+  const [idFront, setIdFront] = useState<string | null>(null);
+  const [idBack, setIdBack] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | undefined>(undefined);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -91,6 +96,8 @@ export function EnrollmentForm() {
       governmentId: "",
       memberType: 'Regular',
       photo: "",
+      idFront: "",
+      idBack: "",
     },
   });
   
@@ -126,7 +133,7 @@ export function EnrollmentForm() {
   }, [showCamera]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    const finalValues = { ...values, photo, joinDate: new Date().toISOString(), tier: values.memberType, points: 0 };
+    const finalValues = { ...values, photo, idFront, idBack, joinDate: new Date().toISOString(), tier: values.memberType, points: 0 };
     
     if (firestore) {
       const membersCollection = collection(firestore, 'memberships');
@@ -140,16 +147,19 @@ export function EnrollmentForm() {
         });
         form.reset();
         setPhoto(null);
+        setIdFront(null);
+        setIdBack(null);
       }
     }
   }
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, setter: (value: string) => void, fieldName: "photo" | "idFront" | "idBack") => {
     if (event.target.files && event.target.files[0]) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        setPhoto(e.target?.result as string);
-        form.setValue('photo', e.target?.result as string);
+        const result = e.target?.result as string;
+        setter(result);
+        form.setValue(fieldName, result);
       };
       reader.readAsDataURL(event.target.files[0]);
     }
@@ -221,7 +231,7 @@ export function EnrollmentForm() {
                                       <Button type="button" className="flex-1" onClick={() => document.getElementById('photo-upload')?.click()}>
                                         <Upload className="mr-2 h-4 w-4" /> Upload
                                       </Button>
-                                      <Input id="photo-upload" type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+                                      <Input id="photo-upload" type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, setPhoto, 'photo')} />
                                       <Button type="button" variant="outline" className="flex-1" onClick={() => setShowCamera(true)}>
                                         <Camera className="mr-2 h-4 w-4" /> Camera
                                       </Button>
@@ -345,6 +355,54 @@ export function EnrollmentForm() {
                   />
                 </div>
               </div>
+
+               <div className="space-y-4 pt-4 border-t">
+                  <h3 className="text-lg font-medium">ID Document</h3>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                       <FormField
+                           control={form.control}
+                           name="idFront"
+                           render={({ field }) => (
+                               <FormItem>
+                                   <FormLabel>ID Front Side</FormLabel>
+                                   <FormControl>
+                                       <div className="flex flex-col items-center gap-4">
+                                           <div className="w-full aspect-video border rounded-md bg-muted flex items-center justify-center overflow-hidden">
+                                               {idFront ? <Image src={idFront} alt="ID Front" width={200} height={126} className="object-contain"/> : <span className="text-muted-foreground text-sm">Preview</span>}
+                                           </div>
+                                           <Button type="button" className="w-full" onClick={() => document.getElementById('id-front-upload')?.click()}>
+                                               <Upload className="mr-2 h-4 w-4" /> Upload Front
+                                           </Button>
+                                           <Input id="id-front-upload" type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, setIdFront, 'idFront')} />
+                                       </div>
+                                   </FormControl>
+                                   <FormMessage />
+                               </FormItem>
+                           )}
+                       />
+                       <FormField
+                           control={form.control}
+                           name="idBack"
+                           render={({ field }) => (
+                               <FormItem>
+                                   <FormLabel>ID Back Side</FormLabel>
+                                   <FormControl>
+                                       <div className="flex flex-col items-center gap-4">
+                                           <div className="w-full aspect-video border rounded-md bg-muted flex items-center justify-center overflow-hidden">
+                                               {idBack ? <Image src={idBack} alt="ID Back" width={200} height={126} className="object-contain" /> : <span className="text-muted-foreground text-sm">Preview</span>}
+                                           </div>
+                                           <Button type="button" className="w-full" onClick={() => document.getElementById('id-back-upload')?.click()}>
+                                               <Upload className="mr-2 h-4 w-4" /> Upload Back
+                                           </Button>
+                                           <Input id="id-back-upload" type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, setIdBack, 'idBack')} />
+                                       </div>
+                                   </FormControl>
+                                   <FormMessage />
+                               </FormItem>
+                           )}
+                       />
+                   </div>
+               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
@@ -506,3 +564,5 @@ export function EnrollmentForm() {
     </>
   );
 }
+
+    

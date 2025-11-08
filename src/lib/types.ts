@@ -15,4 +15,8 @@ export type Member = {
   phone: string;
   address: string;
   expiryDate: Date | string;
+  idFront?: string;
+  idBack?: string;
 };
+
+    
