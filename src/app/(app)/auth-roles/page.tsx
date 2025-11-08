@@ -26,7 +26,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/firebase';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { toast } from '@/hooks/use-toast';
 
 
@@ -148,6 +148,7 @@ function AddUserDialog({ onUserAdded }: { onUserAdded: (user: any) => void }) {
 }
 
 export default function AuthRolesPage() {
+    const auth = useAuth();
     const [users, setUsers] = React.useState(initialUsers);
 
     const [userRoles, setUserRoles] = React.useState<Record<string, Role>>(
@@ -156,14 +157,42 @@ export default function AuthRolesPage() {
 
     const handleRoleChange = (userId: string, role: Role) => {
         setUserRoles(prev => ({ ...prev, [userId]: role }));
-        // In a real app, you would call a function here to update the user's role.
-        toast({ title: "Role ready to save", description: `New role for user is set to ${role}. Click 'Save Changes' in the menu.`})
+        const userEmail = users.find(u => u.id === userId)?.email;
+        toast({ title: "Role Changed (Staged)", description: `Role for ${userEmail} set to ${role}. Click 'Save Changes' to apply.`})
     };
     
     const handleUserAdded = (newUser: any) => {
         setUsers(prev => [...prev, newUser]);
         setUserRoles(prev => ({ ...prev, [newUser.id]: newUser.role }));
     };
+
+    const handleSaveChanges = (userId: string) => {
+        const newRole = userRoles[userId];
+        const userEmail = users.find(u => u.id === userId)?.email;
+        // In a real app, you would call a backend function to set a custom claim.
+        // For now, we just show a toast.
+        toast({
+            title: "Changes Saved (Simulated)",
+            description: `Role for ${userEmail} is now ${newRole}. (This is a simulation)`,
+        });
+    };
+
+    const handleRemoveUser = (userId: string, userEmail: string) => {
+        if (!auth || !auth.currentUser) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Not authenticated.' });
+            return;
+        }
+        
+        // This is a placeholder. In a real app, you can't delete other users from the client.
+        // This would be an admin action on the backend.
+        if (userId.startsWith('user')) {
+             setUsers(prev => prev.filter(user => user.id !== userId));
+             toast({ title: 'User Removed (Simulated)', description: `Successfully removed user ${userEmail}.` });
+        } else {
+            toast({ variant: 'destructive', title: 'Cannot Delete', description: 'This action requires admin privileges and a backend function.' });
+        }
+    };
+
 
     return (
         <div>
@@ -210,8 +239,14 @@ export default function AuthRolesPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuItem>Save Changes</DropdownMenuItem>
-                                <DropdownMenuItem disabled={!permissions[currentUserRole].deleteUser}>Remove User</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleSaveChanges(user.id)}>Save Changes</DropdownMenuItem>
+                                <DropdownMenuItem
+                                    onClick={() => handleRemoveUser(user.id, user.email)}
+                                    disabled={!permissions[currentUserRole].deleteUser}
+                                    className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                                >
+                                    Remove User
+                                </DropdownMenuItem>
                             </DropdownMenuContent>
                             </DropdownMenu>
                         </TableCell>
