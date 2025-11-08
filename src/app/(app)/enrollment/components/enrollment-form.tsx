@@ -33,8 +33,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useFirestore } from "@/firebase";
-import { setDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { useFirestore, setDocumentNonBlocking } from "@/firebase";
 import { collection, doc } from "firebase/firestore";
 import {
   Dialog,
@@ -132,7 +131,7 @@ export function EnrollmentForm() {
     }
   }, [showCamera]);
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
+  function onSubmit(values: z.infer<typeof formSchema>) {
     if (!firestore) {
         toast({ title: "Error", description: "Firestore not available."});
         return;
@@ -150,27 +149,19 @@ export function EnrollmentForm() {
         points: 0 
     };
     
-    try {
-        const memberDocRef = doc(firestore, 'memberships', newId);
-        setDocumentNonBlocking(memberDocRef, finalValues, {});
-        
-        setNewMember({ id: newId, name: values.fullName });
-        setEnrollmentSuccess(true);
-        toast({
-            title: "Enrollment Successful",
-            description: `${values.fullName} has been enrolled as a new member.`,
-        });
-        form.reset();
-        setPhoto(null);
-        setIdFront(null);
-        setIdBack(null);
-    } catch (error) {
-        toast({
-            variant: "destructive",
-            title: "Enrollment Failed",
-            description: "Could not save the new member to the database.",
-        });
-    }
+    const memberDocRef = doc(firestore, 'memberships', newId);
+    setDocumentNonBlocking(memberDocRef, finalValues, {});
+    
+    setNewMember({ id: newId, name: values.fullName });
+    setEnrollmentSuccess(true);
+    toast({
+        title: "Enrollment Successful",
+        description: `${values.fullName} has been enrolled as a new member.`,
+    });
+    form.reset();
+    setPhoto(null);
+    setIdFront(null);
+    setIdBack(null);
   }
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, setter: (value: string) => void, fieldName: "photo" | "idFront" | "idBack") => {
@@ -584,3 +575,5 @@ export function EnrollmentForm() {
     </>
   );
 }
+
+    
