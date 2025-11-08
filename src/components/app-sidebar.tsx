@@ -11,6 +11,7 @@ import {
   Award,
   Settings,
   FileText,
+  KeyRound,
 } from "lucide-react";
 
 import {
@@ -59,6 +60,11 @@ const menuItems = [
     href: "/settings",
     icon: Settings,
     label: "Settings",
+  },
+  {
+    href: "/auth-roles",
+    icon: KeyRound,
+    label: "Auth & Roles",
   },
 ];
 
