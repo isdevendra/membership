@@ -62,9 +62,8 @@ service cloud.firestore {
     /**
      * @description Rules for the /memberships/{membershipId} collection.
      * @path /memberships/{membershipId}
-     * @allow (create) Any authenticated user can create a membership document.
-     * @allow (get, list) Any authenticated user can read membership documents.
-     * @principle Enforces that only authenticated users can interact with membership data.
+     * @allow (create, read, write) Any authenticated user can create, read, and write membership documents.
+     * @principle This allows staff members to manage all member profiles.
      */
     match /memberships/{membershipId} {
       allow read, write: if isSignedIn();
@@ -105,43 +104,31 @@ service cloud.firestore {
     /**
      * @description Rules for the /memberships/{membershipId}/redemptions/{redemptionId} collection.
      * @path /memberships/{membershipId}/redemptions/{redemptionId}
-     * @allow (create) User A can create a redemption record under their membership (request.auth.uid == 'A').
-     * @deny (create) User B cannot create a redemption record under User A's membership (request.auth.uid == 'B', membershipId == 'A').
-     * @allow (get) User A can read their own redemption record.
-     * @deny (get) User B cannot read User A's redemption record.
-     * @principle Enforces document ownership for redemptions.
+     * @allow (read, write) Authenticated users can manage redemption records.
+     * @principle Allows staff to redeem rewards on behalf of members.
      */
     match /memberships/{membershipId}/redemptions/{redemptionId} {
-      // Read/Write rules: Only the owner can manage their own redemptions.
-      allow read, write: if isOwner(membershipId);
+      allow read, write: if isSignedIn();
     }
 
     /**
      * @description Rules for the /memberships/{membershipId}/visitSummaries/{visitSummaryId} collection.
      * @path /memberships/{membershipId}/visitSummaries/{visitSummaryId}
-     * @allow (create) User A can create a visit summary under their membership (request.auth.uid == 'A').
-     * @deny (create) User B cannot create a visit summary under User A's membership (request.auth.uid == 'B', membershipId == 'A').
-     * @allow (get) User A can read their own visit summary.
-     * @deny (get) User B cannot read User A's visit summary.
-     * @principle Enforces document ownership for visit summaries.
+     * @allow (read, write) Authenticated users can manage visit summaries.
+     * @principle Allows staff to manage AI-generated summaries.
      */
     match /memberships/{membershipId}/visitSummaries/{visitSummaryId} {
-      // Read/Write rules: Only the owner can manage their own visit summaries.
-      allow read, write: if isOwner(membershipId);
+      allow read, write: if isSignedIn();
     }
 
     /**
      * @description Rules for the /memberships/{membershipId}/transactions/{transactionId} collection.
      * @path /memberships/{membershipId}/transactions/{transactionId}
-     * @allow (create) User A can create a transaction record under their membership (request.auth.uid == 'A').
-     * @deny (create) User B cannot create a transaction record under User A's membership (request.auth.uid == 'B', membershipId == 'A').
-     * @allow (get) User A can read their own transaction record.
-     * @deny (get) User B cannot read User A's transaction record.
-     * @principle Enforces document ownership for transactions.
+     * @allow (read, write) Authenticated users can manage transactions.
+     * @principle Allows staff to log transactions for members.
      */
     match /memberships/{membershipId}/transactions/{transactionId} {
-      // Read/Write rules: Only the owner can manage their own transactions.
-      allow read, write: if isOwner(membershipId);
+      allow read, write: if isSignedIn();
     }
 
      /**
@@ -155,5 +142,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
