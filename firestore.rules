@@ -60,18 +60,12 @@ service cloud.firestore {
     /**
      * @description Rules for the /memberships/{membershipId} collection.
      * @path /memberships/{membershipId}
-     * @allow (create) User A can create their own membership document if authenticated (request.auth.uid == 'A').
-     * @deny (create) User B cannot create a membership document with User A's ID (request.auth.uid == 'B', membershipId == 'A').
-     * @allow (get) User A can read their own membership document (request.auth.uid == 'A').
-     * @deny (get) User B cannot read User A's membership document (request.auth.uid == 'B', membershipId == 'A').
-     * @principle Enforces document ownership for writes and reads.
+     * @allow (create) Any authenticated user can create a membership document.
+     * @allow (get, list) Any authenticated user can read membership documents.
+     * @principle Enforces that only authenticated users can interact with membership data.
      */
     match /memberships/{membershipId} {
-      // Read rules: Any signed-in user can read the list of members.
-      allow get, list: if isSignedIn();
-      
-      // Write rules: Any signed-in user can create/update/delete.
-      allow write: if isSignedIn();
+      allow read, write: if isSignedIn();
     }
 
     /**
