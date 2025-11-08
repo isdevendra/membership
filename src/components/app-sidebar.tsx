@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -9,6 +10,7 @@ import {
   Users,
   Award,
   Settings,
+  FileText,
 } from "lucide-react";
 
 import {
@@ -47,6 +49,11 @@ const menuItems = [
     href: "/profiler",
     icon: BrainCircuit,
     label: "Patron Profiler",
+  },
+  {
+    href: "/reporting",
+    icon: FileText,
+    label: "Reporting",
   },
   {
     href: "/settings",
