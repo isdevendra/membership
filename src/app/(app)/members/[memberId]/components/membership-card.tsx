@@ -104,17 +104,14 @@ export function MembershipCard({ member }: MembershipCardProps) {
             </div>
 
             <div className="flex items-end gap-4">
-                <Avatar className="h-20 w-20 border-2 border-white">
+                <Avatar className="h-24 w-24 border-2 border-white">
                     <AvatarImage src={member.photo} alt={member.fullName} />
-                    <AvatarFallback className="text-2xl text-black">{member.fullName.charAt(0)}</AvatarFallback>
+                    <AvatarFallback className="text-3xl text-black">{member.fullName.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
                     <p className="font-mono text-xs opacity-80">Name</p>
-                    <p className="font-semibold text-lg leading-tight">{member.fullName}</p>
+                    <p className="font-semibold text-xl leading-tight">{member.fullName}</p>
                     <p className="font-mono text-sm opacity-80">{member.id}</p>
-                </div>
-                <div className="bg-white p-1 rounded-md">
-                    {profileUrl && <QRCode value={profileUrl} size={50} />}
                 </div>
             </div>
 
@@ -129,7 +126,15 @@ export function MembershipCard({ member }: MembershipCardProps) {
                 </div>
             </div>
         </div>
-        <Button onClick={handlePrint} className="w-full mt-4 no-print">Print Card</Button>
+        <div className="flex flex-col items-center mt-4 space-y-4 no-print">
+            {profileUrl && (
+                 <div className="bg-white p-4 rounded-md">
+                    <QRCode value={profileUrl} size={150} />
+                </div>
+            )}
+            <p className="text-sm text-muted-foreground text-center">Scan this code to view the member's profile.</p>
+            <Button onClick={handlePrint} className="w-full">Print Card</Button>
+        </div>
     </div>
   );
 }
