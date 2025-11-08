@@ -25,11 +25,12 @@ import {
   } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useAuth, useFirestore } from '@/firebase';
+import { useAuth, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { toast } from '@/hooks/use-toast';
-import { doc, setDoc } from 'firebase/firestore';
-
+import { collection, doc, setDoc } from 'firebase/firestore';
+import { type Member } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type UserRecord = {
     id: string;
@@ -99,7 +100,6 @@ function AddUserDialog({ onUserAdded }: { onUserAdded: (user: UserRecord) => voi
                 tier: 'Bronze', // Default tier
                 points: 0,
                 joinDate: new Date().toISOString(),
-                // Add other default fields as necessary
                 dob: '',
                 gender: '',
                 nationality: '',
@@ -171,12 +171,36 @@ function AddUserDialog({ onUserAdded }: { onUserAdded: (user: UserRecord) => voi
 
 export default function AuthRolesPage() {
     const auth = useAuth();
-    // The user list is now managed in state, starting empty.
-    const [users, setUsers] = React.useState<UserRecord[]>([]);
+    const firestore = useFirestore();
 
-    const [userRoles, setUserRoles] = React.useState<Record<string, Role>>(
-        users.reduce((acc, user) => ({ ...acc, [user.id]: user.role as Role }), {})
-    );
+    const membersCollection = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return collection(firestore, 'memberships');
+    }, [firestore]);
+
+    const { data: members, isLoading } = useCollection<Member>(membersCollection);
+
+    const users: UserRecord[] = React.useMemo(() => {
+        if (!members) return [];
+        return members.map(member => ({
+            id: member.id,
+            email: member.email,
+            // In a real app, role would come from custom claims or Firestore.
+            // For now, we default everyone to "Member".
+            role: 'Member'
+        }));
+    }, [members]);
+
+    const [userRoles, setUserRoles] = React.useState<Record<string, Role>>({});
+
+    React.useEffect(() => {
+        const initialRoles = users.reduce((acc, user) => {
+            acc[user.id] = user.role;
+            return acc;
+        }, {} as Record<string, Role>);
+        setUserRoles(initialRoles);
+    }, [users]);
+    
 
     const handleRoleChange = (userId: string, role: Role) => {
         setUserRoles(prev => ({ ...prev, [userId]: role }));
@@ -184,9 +208,12 @@ export default function AuthRolesPage() {
         toast({ title: "Role Changed (Staged)", description: `Role for ${userEmail} set to ${role}. Click 'Save Changes' to apply.`})
     };
     
+    // This function can be used to manually add a new user to the local state if needed,
+    // though fetching from the collection is now the primary way users are displayed.
     const handleUserAdded = (newUser: UserRecord) => {
-        setUsers(prev => [...prev, newUser]);
-        setUserRoles(prev => ({ ...prev, [newUser.id]: newUser.role }));
+        // The useCollection hook will automatically update the list,
+        // so we don't strictly need to manually add to a local state anymore.
+        // This function can be kept for optimistic updates if desired.
     };
 
     const handleSaveChanges = (userId: string) => {
@@ -214,10 +241,10 @@ export default function AuthRolesPage() {
             return;
         }
         
-        // For demonstration, we'll remove the user from the local state.
-        // The ability to delete a Firebase user from the client is restricted.
-        setUsers(prev => prev.filter(user => user.id !== userId));
-        toast({ title: 'User Removed (Simulated)', description: `User ${userEmail} removed from the list. A backend function is needed to delete the actual Firebase user.` });
+        // In a real app, you'd call a backend function to delete the user.
+        // We're simulating this by just showing a toast. The user will still exist in Auth.
+        // To also remove from the view, we would need to delete the firestore doc.
+        toast({ title: 'User Removed (Simulated)', description: `User ${userEmail} removed from the list. A backend function is needed to delete the actual Firebase user and their data.` });
     };
 
 
@@ -246,10 +273,18 @@ export default function AuthRolesPage() {
                 </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {users.length === 0 ? (
+                    {isLoading ? (
+                         Array.from({ length: 3 }).map((_, index) => (
+                            <TableRow key={index}>
+                                <TableCell><Skeleton className="h-4 w-[200px]" /></TableCell>
+                                <TableCell><Skeleton className="h-8 w-[180px]" /></TableCell>
+                                <TableCell><Skeleton className="h-8 w-8 rounded-full" /></TableCell>
+                            </TableRow>
+                        ))
+                    ) : users.length === 0 ? (
                         <TableRow>
                             <TableCell colSpan={3} className="h-24 text-center">
-                                No users have been added yet. Use the "Add User" button to create one.
+                                No users found. Use the "Add User" button to create one.
                             </TableCell>
                         </TableRow>
                     ) : (
