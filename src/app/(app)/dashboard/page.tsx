@@ -28,7 +28,7 @@ export default function DashboardPage() {
     if (!members) {
       return {
         totalMembers: 0,
-        newMembersThisMonth: 0,
+        newMembersToday: 0,
         rewardsRedeemed: 42, // Static for now
         totalPoints: 0,
         checkedIn: 0,
@@ -38,12 +38,12 @@ export default function DashboardPage() {
     }
 
     const today = new Date();
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
-    const newMembersThisMonth = members.filter(member => {
+    const newMembersToday = members.filter(member => {
         if (!member.joinDate) return false;
         const joinDate = new Date(member.joinDate);
-        return joinDate >= startOfMonth;
+        return joinDate >= startOfToday;
     }).length;
     
     const totalPoints = members.reduce((sum, member) => sum + (member.points || 0), 0);
@@ -53,7 +53,7 @@ export default function DashboardPage() {
 
     return {
       totalMembers: members.length,
-      newMembersThisMonth,
+      newMembersToday,
       rewardsRedeemed: 42, // This would need redemptions data
       totalPoints,
       checkedIn,
@@ -147,14 +147,14 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              New Members (Month)
+              New Members (Today)
             </CardTitle>
             <CalendarPlus className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">+{stats.newMembersThisMonth}</div>
+            <div className="text-2xl font-bold">+{stats.newMembersToday}</div>
             <p className="text-xs text-muted-foreground">
-              {`Enrolled this month`}
+              {`Enrolled today`}
             </p>
           </CardContent>
         </Card>
@@ -212,5 +212,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    
