@@ -295,18 +295,18 @@ export function MemberTable() {
     toast({ title: 'Check-out Successful', description: `${member.fullName} has been checked out.` });
   };
 
-  const handleBlock = (member: Member) => {
+  const handleBan = (member: Member) => {
     if (!firestore) return;
     const memberDocRef = doc(firestore, 'memberships', member.id);
     updateDocumentNonBlocking(memberDocRef, { tier: 'Blacklist' });
-    toast({ title: 'Member Blocked', description: `${member.fullName} has been moved to the blacklist.` });
+    toast({ title: 'Member Banned', description: `${member.fullName} has been moved to the blacklist.` });
   };
 
-  const handleUnblock = (member: Member) => {
+  const handleUnban = (member: Member) => {
     if (!firestore) return;
     const memberDocRef = doc(firestore, 'memberships', member.id);
     updateDocumentNonBlocking(memberDocRef, { tier: 'Regular' });
-    toast({ title: 'Member Unblocked', description: `${member.fullName} has been unblocked.` });
+    toast({ title: 'Member Unbanned', description: `${member.fullName} has been unbanned.` });
   };
 
 
@@ -499,14 +499,14 @@ export function MemberTable() {
                         </DropdownMenuItem>
                          <DropdownMenuSeparator />
                         {member.tier === 'Blacklist' ? (
-                            <DropdownMenuItem onClick={() => handleUnblock(member)}>
+                            <DropdownMenuItem onClick={() => handleUnban(member)}>
                                 <CheckCircle2 className="mr-2 h-4 w-4" />
-                                Unblock Member
+                                Unban Member
                             </DropdownMenuItem>
                         ) : (
-                             <DropdownMenuItem onClick={() => handleBlock(member)} className="text-red-600 focus:text-red-600">
+                             <DropdownMenuItem onClick={() => handleBan(member)} className="text-red-600 focus:text-red-600">
                                 <Ban className="mr-2 h-4 w-4" />
-                                Block Member
+                                Ban Member
                             </DropdownMenuItem>
                         )}
                       </DropdownMenuContent>
@@ -523,3 +523,5 @@ export function MemberTable() {
 }
 
   
+
+    
