@@ -11,18 +11,18 @@ export default function AppLayout({
 }>) {
   return (
     <FirebaseClientProvider>
-      <AuthProvider>
         <SettingsProvider>
-            <SidebarProvider>
-            <AppSidebar />
-            <SidebarInset>
-                <div className="min-h-screen p-4 sm:p-6 lg:p-8">
-                    {children}
-                </div>
-            </SidebarInset>
-            </SidebarProvider>
+            <AuthProvider>
+                <SidebarProvider>
+                <AppSidebar />
+                <SidebarInset>
+                    <div className="min-h-screen p-4 sm:p-6 lg:p-8">
+                        {children}
+                    </div>
+                </SidebarInset>
+                </SidebarProvider>
+            </AuthProvider>
         </SettingsProvider>
-      </AuthProvider>
     </FirebaseClientProvider>
   );
 }
