@@ -25,9 +25,10 @@ import {
   } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useAuth } from '@/firebase';
+import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { toast } from '@/hooks/use-toast';
+import { doc, setDoc } from 'firebase/firestore';
 
 
 type UserRecord = {
@@ -69,6 +70,7 @@ function RoleSelector({ value, onValueChange, disabled }: { value: Role; onValue
 
 function AddUserDialog({ onUserAdded }: { onUserAdded: (user: UserRecord) => void }) {
     const auth = useAuth();
+    const firestore = useFirestore();
     const [isOpen, setIsOpen] = React.useState(false);
     const [email, setEmail] = React.useState('');
     const [password, setPassword] = React.useState('');
@@ -76,7 +78,7 @@ function AddUserDialog({ onUserAdded }: { onUserAdded: (user: UserRecord) => voi
     const [isLoading, setIsLoading] = React.useState(false);
 
     const handleAddUser = async () => {
-        if (!auth) return;
+        if (!auth || !firestore) return;
         setIsLoading(true);
         try {
             // NOTE: In a real app, you'd typically use a Cloud Function to create users
@@ -87,9 +89,30 @@ function AddUserDialog({ onUserAdded }: { onUserAdded: (user: UserRecord) => voi
             
             // In a real app, you'd set the custom claim for the role on the backend here.
             // For now, we are managing roles in the client state.
+            
+            // Also create a member document in Firestore
+            const memberDocRef = doc(firestore, 'memberships', userCredential.user.uid);
+            await setDoc(memberDocRef, {
+                id: userCredential.user.uid,
+                email: userCredential.user.email,
+                fullName: userCredential.user.email, // Use email as placeholder
+                tier: 'Bronze', // Default tier
+                points: 0,
+                joinDate: new Date().toISOString(),
+                // Add other default fields as necessary
+                dob: '',
+                gender: '',
+                nationality: '',
+                governmentId: '',
+                phone: '',
+                address: '',
+                expiryDate: '',
+            });
+
+
             onUserAdded(newUser);
 
-            toast({ title: 'User Created', description: `Successfully created user ${email}.` });
+            toast({ title: 'User Created', description: `Successfully created user ${email} and their member profile.` });
             setIsOpen(false);
             setEmail('');
             setPassword('');
@@ -116,7 +139,7 @@ function AddUserDialog({ onUserAdded }: { onUserAdded: (user: UserRecord) => voi
                 <DialogHeader>
                     <DialogTitle>Add New User</DialogTitle>
                     <DialogDescription>
-                        Create a new user and assign them a role. Note: this creates a real Firebase Auth user.
+                        Create a new user and assign them a role. Note: this creates a real Firebase Auth user and a member profile.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
