@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
@@ -7,10 +8,12 @@ import { useParams } from 'next/navigation';
 import { PageHeader } from '@/components/page-header';
 import { type Member } from '@/lib/types';
 import { MembershipCard } from './components/membership-card';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
+import Image from 'next/image';
+import { Separator } from '@/components/ui/separator';
 
 const toDate = (dateValue: any): Date | null => {
     if (!dateValue) return null;
@@ -68,8 +71,29 @@ export default function MemberProfilePage() {
     <div>
       <PageHeader title="Member Profile" />
       <div className="grid gap-8 lg:grid-cols-3">
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 space-y-8">
             <MembershipCard member={member} />
+
+            <Card>
+                <CardHeader>
+                    <CardTitle className="font-headline">ID Documents</CardTitle>
+                    <CardDescription>Scanned ID documents for verification.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div>
+                        <p className="text-sm font-medium text-muted-foreground">ID Front</p>
+                        <div className="mt-2 w-full aspect-video border rounded-md bg-muted flex items-center justify-center overflow-hidden">
+                            {member.idFront ? <Image src={member.idFront} alt="ID Front" width={300} height={189} className="object-contain"/> : <span className="text-muted-foreground text-sm">Not provided</span>}
+                        </div>
+                    </div>
+                     <div>
+                        <p className="text-sm font-medium text-muted-foreground">ID Back</p>
+                        <div className="mt-2 w-full aspect-video border rounded-md bg-muted flex items-center justify-center overflow-hidden">
+                            {member.idBack ? <Image src={member.idBack} alt="ID Back" width={300} height={189} className="object-contain"/> : <span className="text-muted-foreground text-sm">Not provided</span>}
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
         <div className="lg:col-span-2">
             <Card>
@@ -88,7 +112,9 @@ export default function MemberProfilePage() {
                         </div>
                    </div>
 
-                   <div className="grid grid-cols-2 gap-4 border-t pt-4">
+                   <Separator />
+
+                   <div className="grid grid-cols-2 gap-4">
                         <div>
                             <p className="text-sm text-muted-foreground">Tier</p>
                             <p className="font-semibold">{member.tier}</p>
@@ -141,3 +167,4 @@ export default function MemberProfilePage() {
     </div>
   );
 }
+
