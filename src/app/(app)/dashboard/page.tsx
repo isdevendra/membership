@@ -7,12 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MembershipChart } from './components/membership-chart';
 import { TierDistributionChart } from './components/tier-distribution-chart';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { collection, Timestamp } from 'firebase/firestore';
 import type { Member } from '@/lib/types';
 import { useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TopSpenders } from './components/top-spenders';
 import { FrequentVisitors } from './components/frequent-visitors';
+import { toDate } from '@/lib/utils';
+import { startOfToday } from 'date-fns';
 
 export default function DashboardPage() {
   const firestore = useFirestore();
@@ -37,13 +39,12 @@ export default function DashboardPage() {
       };
     }
 
-    const today = new Date();
-    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const todayStart = startOfToday();
 
     const newMembersToday = members.filter(member => {
         if (!member.joinDate) return false;
-        const joinDate = new Date(member.joinDate);
-        return joinDate >= startOfToday;
+        const joinDate = toDate(member.joinDate);
+        return joinDate ? joinDate >= todayStart : false;
     }).length;
     
     const totalPoints = members.reduce((sum, member) => sum + (member.points || 0), 0);

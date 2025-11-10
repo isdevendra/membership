@@ -13,9 +13,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy, getDocs, collectionGroup } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, collectionGroup, Timestamp } from 'firebase/firestore';
 import { type Member, type CheckIn } from '@/lib/types';
-import { cn } from '@/lib/utils';
+import { cn, toDate } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 
@@ -23,18 +23,6 @@ type ReportType = 'daily-new-members' | 'checked-in-now' | 'banned-members' | 'm
 
 type ActivityLog = CheckIn & { memberFullName?: string; memberEmail?: string; };
 
-
-// Helper to convert various date formats to a Date object
-const toDate = (dateValue: any): Date | null => {
-    if (!dateValue) return null;
-    if (dateValue.toDate) return dateValue.toDate(); // Firestore Timestamp
-    if (typeof dateValue === 'string' || typeof dateValue === 'number') {
-      const date = new Date(dateValue);
-      return !isNaN(date.getTime()) ? date : null;
-    }
-    if (dateValue instanceof Date) return dateValue;
-    return null;
-};
 
 export function ReportingTool() {
   const firestore = useFirestore();
@@ -52,9 +40,9 @@ export function ReportingTool() {
         switch(reportType) {
             case 'daily-new-members':
                 if (!dateRange?.from) return null;
-                const startJoin = startOfDay(dateRange.from);
-                const endJoin = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
-                return query(baseQuery, where('joinDate', '>=', startJoin.toISOString()), where('joinDate', '<=', endJoin.toISOString()), orderBy('joinDate', 'desc'));
+                const startJoin = Timestamp.fromDate(startOfDay(dateRange.from));
+                const endJoin = dateRange.to ? Timestamp.fromDate(endOfDay(dateRange.to)) : Timestamp.fromDate(endOfDay(dateRange.from));
+                return query(baseQuery, where('joinDate', '>=', startJoin), where('joinDate', '<=', endJoin), orderBy('joinDate', 'desc'));
             
             case 'checked-in-now':
                  return query(baseQuery, where('status', '==', 'Checked In'));

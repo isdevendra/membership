@@ -1,4 +1,6 @@
 
+import { Timestamp } from 'firebase/firestore';
+
 export type MemberTier = 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Regular' | 'VIP' | 'Staff' | 'Blacklist';
 
 export type MemberStatus = 'Checked In' | 'Checked Out';
@@ -8,16 +10,16 @@ export type Member = {
   fullName: string;
   photo?: string;
   email: string;
-  joinDate: string;
+  joinDate: Timestamp | string;
   tier: MemberTier;
   points: number;
-  dob: Date | string;
+  dob: Timestamp | Date | string;
   gender: string;
   nationality: string;
   governmentId: string;
   phone: string;
   address: string;
-  expiryDate: Date | string;
+  expiryDate: Timestamp | Date | string;
   idFront?: string;
   idBack?: string;
   status?: MemberStatus;

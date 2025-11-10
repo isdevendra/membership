@@ -10,7 +10,7 @@ import { toast } from "@/hooks/use-toast";
 import React, { useState, useRef, useEffect } from 'react';
 import QRCode from "react-qr-code";
 
-import { cn } from "@/lib/utils";
+import { cn, toDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -34,7 +34,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useFirestore, setDocumentNonBlocking } from "@/firebase";
-import { collection, doc } from "firebase/firestore";
+import { collection, doc, Timestamp } from "firebase/firestore";
 import {
   Dialog,
   DialogContent,
@@ -139,12 +139,14 @@ export function EnrollmentForm() {
 
     const newId = Date.now().toString();
     const finalValues = { 
-        ...values, 
+        ...values,
         id: newId, 
         photo, 
         idFront, 
         idBack, 
-        joinDate: new Date().toISOString(), 
+        joinDate: Timestamp.fromDate(new Date()),
+        expiryDate: Timestamp.fromDate(values.expiryDate),
+        dob: Timestamp.fromDate(values.dob),
         tier: values.memberType, 
         points: 0 
     };
@@ -164,7 +166,7 @@ export function EnrollmentForm() {
     setIdBack(null);
   }
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, setter: (value: string) => void, fieldName: "photo" | "idFront" | "idBack") => {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, setter: (value: string | null) => void, fieldName: "photo" | "idFront" | "idBack") => {
     if (event.target.files && event.target.files[0]) {
       const reader = new FileReader();
       reader.onload = (e) => {
