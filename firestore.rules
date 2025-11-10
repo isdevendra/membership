@@ -1,150 +1,23 @@
 
-/**
- * @fileoverview Firestore Security Rules for the Casino Membership Application.
- *
- * Core Philosophy:
- * This ruleset enforces a strict user-ownership model for membership data,
- * ensuring that users can only access and modify their own information.
- * Public read-only access is granted for tiers and rewards.
- *
- * Data Structure:
- * - /memberships/{membershipId}: Stores individual member profiles.
- * - /tiers/{tierId}: Stores membership tier definitions.
- * - /rewards/{rewardId}: Stores reward definitions.
- * - /memberships/{membershipId}/redemptions/{redemptionId}: Stores redemption records for a member.
- * - /memberships/{membershipId}/visitSummaries/{visitSummaryId}: Stores visit summaries for a member.
- * - /memberships/{membershipId}/transactions/{transactionId}: Stores transaction records for a member.
- * - /memberships/{membershipId}/checkins/{checkinId}: Stores check-in records for a member.
- *
- * Key Security Decisions:
- * - Memberships are private and accessible only to the authenticated user matching the membership ID.
- * - Tiers and Rewards are public read-only.
- * - Subcollections (redemptions, visitSummaries, transactions, checkins) are also user-owned.
- * - Data validation is limited to relational integrity checks, not full schema validation.
- *
- * Denormalization for Authorization:
- *  Path-based ownership is utilized, meaning the `membershipId` in the path
- *  is used to verify ownership, avoiding the need for document reads.
- *
- * Structural Segregation:
- * Public read-only data (Tiers, Rewards) is stored in top-level collections,
- * while private user data (Memberships, Redemptions, VisitSummaries, Transactions)
- * is stored either in a top-level collection secured by ownership or under
- * a user-owned document.
- */
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-
+    
     /**
-     * @description Checks if the request is authenticated.
+     * @description Checks if the request is from an authenticated user.
      */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * @description Checks if the authenticated user ID matches the provided user ID.
+     * Default-allow rule for an internal staff-facing application.
+     * Grants full read and write access to any authenticated user
+     * for all collections and documents.
      */
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the authenticated user is the owner of the existing document.
-     *  This combines the `isOwner` check with `resource != null` to ensure the document exists.
-     * @param userId The expected owner's user ID.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
-    }
-
-    /**
-     * @description Rules for the /memberships/{membershipId} collection.
-     * @path /memberships/{membershipId}
-     * @allow (create, read, write) Any authenticated user can create, read, and write membership documents.
-     * @principle This allows staff members to manage all member profiles.
-     */
-    match /memberships/{membershipId} {
+    match /{document=**} {
       allow read, write: if isSignedIn();
-    }
-
-    /**
-     * @description Rules for the /tiers/{tierId} collection.
-     * @path /tiers/{tierId}
-     * @allow (get) Any user can read tier information.
-     * @allow (list) Any user can list tier information.
-     * @deny (create) No one can create tiers through the client.
-     * @principle Provides public read-only access to tier data.
-     */
-    match /tiers/{tierId} {
-      // Read rules: Public read access.
-      allow get, list: if true;
-
-      // Write rules: No client-side writes allowed.
-      allow create, update, delete: if false;
-    }
-
-    /**
-     * @description Rules for the /rewards/{rewardId} collection.
-     * @path /rewards/{rewardId}
-     * @allow (get) Any user can read reward information.
-     * @allow (list) Any user can list reward information.
-     * @deny (create) No one can create rewards through the client.
-     * @principle Provides public read-only access to reward data.
-     */
-    match /rewards/{rewardId} {
-      // Read rules: Public read access.
-      allow get, list: if true;
-
-      // Write rules: No client-side writes allowed.
-      allow create, update, delete: if false;
-    }
-
-    /**
-     * @description Rules for the /memberships/{membershipId}/redemptions/{redemptionId} collection.
-     * @path /memberships/{membershipId}/redemptions/{redemptionId}
-     * @allow (read, write) Authenticated users can manage redemption records.
-     * @principle Allows staff to redeem rewards on behalf of members.
-     */
-    match /memberships/{membershipId}/redemptions/{redemptionId} {
-      allow read, write: if isSignedIn();
-    }
-
-    /**
-     * @description Rules for the /memberships/{membershipId}/visitSummaries/{visitSummaryId} collection.
-     * @path /memberships/{membershipId}/visitSummaries/{visitSummaryId}
-     * @allow (read, write) Authenticated users can manage visit summaries.
-     * @principle Allows staff to manage AI-generated summaries.
-     */
-    match /memberships/{membershipId}/visitSummaries/{visitSummaryId} {
-      allow read, write: if isSignedIn();
-    }
-
-    /**
-     * @description Rules for the /memberships/{membershipId}/transactions/{transactionId} collection.
-     * @path /memberships/{membershipId}/transactions/{transactionId}
-     * @allow (read, write) Authenticated users can manage transactions.
-     * @principle Allows staff to log transactions for members.
-     */
-    match /memberships/{membershipId}/transactions/{transactionId} {
-      allow read, write: if isSignedIn();
-    }
-
-     /**
-     * @description Rules for the /memberships/{membershipId}/checkins/{checkinId} collection group.
-     * This rule allows authorized staff to query across all check-in records for reporting purposes.
-     * @path /memberships/{membershipId}/checkins/{checkinId}
-     * @allow (read, write) Any authenticated user can manage check-in records.
-     * @allow (list) on `checkins` collection group for reporting.
-     * @principle Allows staff to manage member check-ins and generate activity reports.
-     */
-    match /memberships/{membershipId}/checkins/{checkinId} {
-      allow read, write: if isSignedIn();
-    }
-
-     match /{path=**}/checkins/{checkinId} {
-      allow list: if isSignedIn();
     }
   }
 }
