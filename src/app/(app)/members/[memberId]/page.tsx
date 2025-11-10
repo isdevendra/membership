@@ -11,7 +11,6 @@ import { type Member } from '@/lib/types';
 import { MembershipCard } from './components/membership-card';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import Image from 'next/image';
 import { Separator } from '@/components/ui/separator';
@@ -19,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Upload } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
+import { EditMemberDialog } from './components/edit-member-dialog';
 
 const toDate = (dateValue: any): Date | null => {
     if (!dateValue) return null;
@@ -48,7 +48,7 @@ export default function MemberProfilePage() {
     return doc(firestore, 'memberships', memberId);
   }, [firestore, memberId]);
 
-  const { data: member, isLoading } = useDoc<Member>(memberDocRef);
+  const { data: member, isLoading, setData } = useDoc<Member>(memberDocRef);
 
   const [idFront, setIdFront] = useState<string | null | undefined>(null);
   const [idBack, setIdBack] = useState<string | null | undefined>(null);
@@ -90,6 +90,12 @@ export default function MemberProfilePage() {
         description: "The new ID images have been saved.",
     });
     setHasChanges(false);
+  };
+  
+  const handleMemberUpdate = (updatedData: Partial<Member>) => {
+    if (member) {
+        setData({ ...member, ...updatedData });
+    }
   };
 
 
@@ -156,8 +162,9 @@ export default function MemberProfilePage() {
         </div>
         <div className="lg:col-span-2">
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle className="font-headline">Member Details</CardTitle>
+                    <EditMemberDialog member={member} onUpdate={handleMemberUpdate} />
                 </CardHeader>
                 <CardContent className="space-y-4">
                    <div className="flex items-center gap-4">
