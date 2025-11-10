@@ -251,7 +251,7 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
                                 <Button type="button" className="flex-1" onClick={() => document.getElementById('photo-upload-edit')?.click()}>
                                 <Upload className="mr-2 h-4 w-4" /> Upload
                                 </Button>
-                                <Input id="photo-upload-edit" type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, setPhoto, 'photo')} />
+                                <Input id="photo-upload-edit" type="file" accept="image/jpeg, image/jpg, image/png" className="hidden" onChange={(e) => handleFileChange(e, setPhoto, 'photo')} />
                                 <Button type="button" variant="outline" className="flex-1" onClick={() => setShowCamera(true)}>
                                 <Camera className="mr-2 h-4 w-4" /> Camera
                                 </Button>
@@ -450,7 +450,7 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
                                         <Button type="button" className="w-full" onClick={() => document.getElementById('id-front-upload-edit')?.click()}>
                                             <Upload className="mr-2 h-4 w-4" /> Upload Front
                                         </Button>
-                                        <Input id="id-front-upload-edit" type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, setIdFront, 'idFront')} />
+                                        <Input id="id-front-upload-edit" type="file" accept="image/jpeg, image/jpg, image/png" className="hidden" onChange={(e) => handleFileChange(e, setIdFront, 'idFront')} />
                                     </div>
                                 </FormControl>
                                 <FormMessage />
@@ -471,7 +471,7 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
                                         <Button type="button" className="w-full" onClick={() => document.getElementById('id-back-upload-edit')?.click()}>
                                             <Upload className="mr-2 h-4 w-4" /> Upload Back
                                         </Button>
-                                        <Input id="id-back-upload-edit" type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, setIdBack, 'idBack')} />
+                                        <Input id="id-back-upload-edit" type="file" accept="image/jpeg, image/jpg, image/png" className="hidden" onChange={(e) => handleFileChange(e, setIdBack, 'idBack')} />
                                     </div>
                                 </FormControl>
                                 <FormMessage />
