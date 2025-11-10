@@ -3,8 +3,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { DateRange } from 'react-day-picker';
-import { format, startOfDay, endOfDay } from 'date-fns';
-import { Download, CalendarIcon } from 'lucide-react';
+import { format, startOfDay, endOfDay, parseISO, differenceInDays } from 'date-fns';
+import { Download, CalendarIcon, Cake } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 
-type ReportType = 'daily-new-members' | 'checked-in-now' | 'banned-members' | 'member-activity-logs' | 'expiring-memberships' | 'redemption-summary';
+type ReportType = 'daily-new-members' | 'checked-in-now' | 'banned-members' | 'member-activity-logs' | 'expiring-memberships' | 'redemption-summary' | 'member-birthdays';
 
 type ActivityLog = CheckIn & { memberFullName?: string; memberEmail?: string; };
 
@@ -61,6 +61,9 @@ export function ReportingTool() {
             
             case 'banned-members':
                  return query(baseQuery, where('tier', '==', 'Blacklist'));
+            
+            case 'member-birthdays':
+                 return query(baseQuery, orderBy('fullName'));
             
             default:
                 return null;
@@ -121,7 +124,10 @@ export function ReportingTool() {
     }, [reportType, dateRange, firestore]);
     
   const downloadCSV = (data: any[], headers: string[], filename: string) => {
-    if (!data || data.length === 0) return;
+    if (!data || data.length === 0) {
+        toast({ variant: 'destructive', title: 'No data to export' });
+        return;
+    };
 
     let csvContent = "data:text/csv;charset=utf-8," 
       + headers.join(",") + "\n" 
@@ -135,6 +141,33 @@ export function ReportingTool() {
     link.click();
     document.body.removeChild(link);
   };
+
+  const birthdayReportData = useMemo(() => {
+    if (reportType !== 'member-birthdays' || !members) return [];
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayMonth = today.getMonth();
+    const todayDate = today.getDate();
+
+    return members
+        .map(member => {
+            const dob = toDate(member.dob);
+            if (!dob) return null;
+
+            let nextBirthday = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
+            if (nextBirthday < today) {
+                nextBirthday.setFullYear(today.getFullYear() + 1);
+            }
+            
+            const daysUntil = differenceInDays(nextBirthday, today);
+            return { ...member, dobDate: dob, daysUntilNextBirthday: daysUntil };
+        })
+        .filter(Boolean)
+        .sort((a, b) => a!.daysUntilNextBirthday - b!.daysUntilNextBirthday) as (Member & { dobDate: Date; daysUntilNextBirthday: number })[];
+    
+  }, [reportType, members]);
+
 
   const renderReport = () => {
     const isLoading = isLoadingMembers || isLoadingActivity;
@@ -309,6 +342,52 @@ export function ReportingTool() {
               </div>
             </>
           );
+    case 'member-birthdays':
+        return (
+        <>
+            <div className="flex justify-end">
+            <Button onClick={() => downloadCSV(
+                birthdayReportData?.map(m => [`"${m.fullName}"`, format(m.dobDate, 'yyyy-MM-dd')]) ?? [],
+                ['Full Name', 'Date of Birth'],
+                'member_birthdays_report'
+            )} disabled={!birthdayReportData || birthdayReportData.length === 0}>
+                <Download className="mr-2 h-4 w-4" />
+                Download CSV
+            </Button>
+            </div>
+            <div className="border rounded-lg">
+            <Table>
+                <TableHeader>
+                <TableRow>
+                    <TableHead>Member</TableHead>
+                    <TableHead>Date of Birth</TableHead>
+                    <TableHead>Days Until Next Birthday</TableHead>
+                </TableRow>
+                </TableHeader>
+                <TableBody>
+                {isLoading && <TableRow><TableCell colSpan={3} className="text-center">Loading report...</TableCell></TableRow>}
+                {!isLoading && birthdayReportData?.length === 0 && <TableRow><TableCell colSpan={3} className="text-center">No members found or no members have a date of birth set.</TableCell></TableRow>}
+                {!isLoading && birthdayReportData?.map(member => (
+                    <TableRow key={member.id}>
+                    <TableCell>
+                        <div className="font-medium">{member.fullName}</div>
+                        <div className="text-sm text-muted-foreground">{member.email}</div>
+                    </TableCell>
+                    <TableCell>{format(member.dobDate, 'MMMM do')}</TableCell>
+                    <TableCell>
+                        {member.daysUntilNextBirthday === 0 ? (
+                            <Badge className="bg-primary hover:bg-primary"><Cake className="mr-2 h-4 w-4"/> Today!</Badge>
+                        ) : (
+                            `${member.daysUntilNextBirthday} days`
+                        )}
+                    </TableCell>
+                    </TableRow>
+                ))}
+                </TableBody>
+            </Table>
+            </div>
+        </>
+        );
       default:
         return (
           <div className="flex items-center justify-center h-40 border-2 border-dashed rounded-lg">
@@ -335,6 +414,7 @@ export function ReportingTool() {
               <SelectItem value="checked-in-now">Currently Checked-in</SelectItem>
               <SelectItem value="banned-members">Banned Members</SelectItem>
               <SelectItem value="member-activity-logs">Member Activity Logs</SelectItem>
+              <SelectItem value="member-birthdays">Member Birthdays</SelectItem>
               <SelectItem value="expiring-memberships" disabled>Expiring Memberships</SelectItem>
               <SelectItem value="redemption-summary" disabled>Point Redemption Summary</SelectItem>
             </SelectContent>
@@ -348,6 +428,7 @@ export function ReportingTool() {
                   "w-full justify-start text-left font-normal md:w-[300px]",
                   !dateRange && "text-muted-foreground"
                 )}
+                disabled={reportType === 'member-birthdays' || reportType === 'checked-in-now' || reportType === 'banned-members'}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
                 {dateRange?.from ? (
@@ -382,5 +463,3 @@ export function ReportingTool() {
     </Card>
   );
 }
-
-    
