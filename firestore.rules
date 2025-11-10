@@ -132,13 +132,19 @@ service cloud.firestore {
     }
 
      /**
-     * @description Rules for the /memberships/{membershipId}/checkins/{checkinId} collection.
+     * @description Rules for the /memberships/{membershipId}/checkins/{checkinId} collection group.
+     * This rule allows authorized staff to query across all check-in records for reporting purposes.
      * @path /memberships/{membershipId}/checkins/{checkinId}
-     * @allow (create, read, write) Any authenticated user can manage check-in records.
-     * @principle Allows staff to manage member check-ins.
+     * @allow (read, write) Any authenticated user can manage check-in records.
+     * @allow (list) on `checkins` collection group for reporting.
+     * @principle Allows staff to manage member check-ins and generate activity reports.
      */
     match /memberships/{membershipId}/checkins/{checkinId} {
       allow read, write: if isSignedIn();
+    }
+
+     match /{path=**}/checkins/{checkinId} {
+      allow list: if isSignedIn();
     }
   }
 }
