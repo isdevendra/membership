@@ -14,6 +14,7 @@ import {
   KeyRound,
   LogOut,
   LogIn,
+  UploadCloud,
 } from "lucide-react";
 
 import {
@@ -68,6 +69,11 @@ const menuItems = [
     href: "/reporting",
     icon: FileText,
     label: "Reporting",
+  },
+  {
+    href: "/import-export",
+    icon: UploadCloud,
+    label: "Import / Export",
   },
   {
     href: "/settings",
