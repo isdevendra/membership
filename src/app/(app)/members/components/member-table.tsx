@@ -55,7 +55,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { type Member, type MemberTier } from "@/lib/types";
 import { useCollection, useFirestore, useMemoFirebase, useUser, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
-import { collection, doc, Timestamp, query, orderBy, limit } from "firebase/firestore";
+import { collection, doc, Timestamp, query, orderBy, limit, getDocs } from "firebase/firestore";
 import { format } from "date-fns";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -225,7 +225,8 @@ export function MemberTable() {
 
   const [searchTerm, setSearchTerm] = React.useState("");
   const [tierFilter, setTierFilter] = React.useState<MemberTier | "all">("all");
-  const [dateRange, setDateRange] = React.useState<DateRange | undefined>(undefined);
+  const [fromDate, setFromDate] = React.useState<Date | undefined>(undefined);
+  const [toDateFilter, setToDateFilter] = React.useState<Date | undefined>(undefined);
 
   const isLoading = isUserLoading || isLoadingMembers;
 
@@ -243,19 +244,20 @@ export function MemberTable() {
 
       // Date range filter
       const joinDate = toDate(member.joinDate);
-      const matchesDate = !dateRange || (joinDate &&
-        (!dateRange.from || joinDate >= dateRange.from) &&
-        (!dateRange.to || joinDate <= dateRange.to));
+      const matchesDate = joinDate &&
+        (!fromDate || joinDate >= fromDate) &&
+        (!toDateFilter || joinDate <= toDateFilter);
 
-      return matchesSearch && matchesTier && matchesDate;
+      return matchesSearch && matchesTier && (!fromDate || !toDateFilter || matchesDate);
     });
-  }, [members, searchTerm, tierFilter, dateRange]);
+  }, [members, searchTerm, tierFilter, fromDate, toDateFilter]);
   
-  const isFiltered = tierFilter !== 'all' || dateRange !== undefined;
+  const isFiltered = tierFilter !== 'all' || fromDate !== undefined || toDateFilter !== undefined;
 
   const clearFilters = () => {
     setTierFilter('all');
-    setDateRange(undefined);
+    setFromDate(undefined);
+    setToDateFilter(undefined);
   }
 
   const handleCheckIn = (member: Member) => {
@@ -282,8 +284,8 @@ export function MemberTable() {
     const checkInsQuery = query(collection(firestore, 'memberships', member.id, 'checkins'), orderBy('checkInTime', 'desc'), limit(1));
     // Since we are not using useCollection, we need to get the documents manually
     // This is a one-time read, which is fine for a user action.
-    const getDocs = await import('firebase/firestore').then(m => m.getDocs);
-    const snapshot = await getDocs(checkInsQuery);
+    const getDocsFunc = await import('firebase/firestore').then(m => m.getDocs);
+    const snapshot = await getDocsFunc(checkInsQuery);
     const latestCheckIn = snapshot.docs.find(d => !(d.data() as any).checkOutTime);
     
     if (latestCheckIn) {
@@ -353,32 +355,45 @@ export function MemberTable() {
                         variant={"outline"}
                         className={cn(
                         "w-full justify-start text-left font-normal sm:w-[240px]",
-                        !dateRange && "text-muted-foreground"
+                        !fromDate && "text-muted-foreground"
                         )}
                     >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dateRange?.from ? (
-                        dateRange.to ? (
-                            <>
-                            {format(dateRange.from, "LLL dd, y")} -{" "}
-                            {format(dateRange.to, "LLL dd, y")}
-                            </>
-                        ) : (
-                            format(dateRange.from, "LLL dd, y")
-                        )
-                        ) : (
-                        <span>Filter by join date</span>
-                        )}
+                        {fromDate ? format(fromDate, "LLL dd, y") : <span>From date</span>}
                     </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="end">
                     <Calendar
                         initialFocus
-                        mode="range"
-                        defaultMonth={dateRange?.from}
-                        selected={dateRange}
-                        onSelect={setDateRange}
-                        numberOfMonths={2}
+                        mode="single"
+                        selected={fromDate}
+                        onSelect={setFromDate}
+                        numberOfMonths={1}
+                    />
+                    </PopoverContent>
+                </Popover>
+                
+                <Popover>
+                    <PopoverTrigger asChild>
+                    <Button
+                        id="date"
+                        variant={"outline"}
+                        className={cn(
+                        "w-full justify-start text-left font-normal sm:w-[240px]",
+                        !toDateFilter && "text-muted-foreground"
+                        )}
+                    >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {toDateFilter ? format(toDateFilter, "LLL dd, y") : <span>To date</span>}
+                    </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                        initialFocus
+                        mode="single"
+                        selected={toDateFilter}
+                        onSelect={setToDateFilter}
+                        numberOfMonths={1}
                     />
                     </PopoverContent>
                 </Popover>
