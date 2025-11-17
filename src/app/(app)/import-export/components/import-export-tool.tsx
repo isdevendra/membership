@@ -5,8 +5,8 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Download, Upload, FileText, AlertTriangle, CheckCircle } from 'lucide-react';
-import { useCollection, useFirestore, addDocumentNonBlocking, useMemoFirebase } from '@/firebase';
-import { collection, Timestamp } from 'firebase/firestore';
+import { useCollection, useFirestore, addDocumentNonBlocking, useMemoFirebase, setDocumentNonBlocking } from '@/firebase';
+import { collection, doc, Timestamp } from 'firebase/firestore';
 import { type Member, MemberTier, MemberStatus } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 import { z } from 'zod';
@@ -15,6 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toDate } from '@/lib/utils';
 
 const memberImportSchema = z.object({
+  id: z.string().optional(),
   fullName: z.string().min(2),
   email: z.string().email(),
   tier: z.enum(['Bronze', 'Silver', 'Gold', 'Platinum', 'Regular', 'VIP', 'Staff', 'Blacklist']),
@@ -100,29 +101,23 @@ export function ImportExportTool() {
     const reader = new FileReader();
     reader.onload = async (e) => {
       const text = e.target?.result as string;
-      const rows = text.split('\n').slice(1); // Skip header
-      const totalRows = rows.length;
+      const rows = text.split('\n');
+      const header = rows[0].trim().split(',');
+      const dataRows = rows.slice(1);
+      const totalRows = dataRows.length;
       let successfulImports = 0;
       const errors: string[] = [];
   
       for (let i = 0; i < totalRows; i++) {
-        const rowText = rows[i].trim();
+        const rowText = dataRows[i].trim();
         if (!rowText) continue;
 
-        // Basic CSV parsing, not robust for all cases (e.g. commas in fields)
-        const row = rowText.split(',');
-  
-        const rowData = {
-          fullName: row[0]?.replace(/"/g, ''),
-          email: row[1],
-          tier: row[2] as MemberTier,
-          points: parseInt(row[3], 10),
-          phone: row[4]?.replace(/"/g, ''),
-          address: row[5]?.replace(/"/g, ''),
-          dob: row[6],
-          joinDate: row[7],
-          expiryDate: row[8],
-        };
+        // This is a very basic CSV parser, may not handle all edge cases.
+        const values = rowText.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+        const rowData: { [key: string]: any } = {};
+        header.forEach((key, index) => {
+            rowData[key] = values[index]?.replace(/"/g, '') || '';
+        });
   
         const validation = memberImportSchema.safeParse(rowData);
   
@@ -130,18 +125,23 @@ export function ImportExportTool() {
           errors.push(`Row ${i + 2}: ${validation.error.errors.map(e => e.message).join(', ')}`);
         } else {
           try {
-            
-            const newId = Date.now().toString() + i;
-            
-            addDocumentNonBlocking(membersCollectionRef, {
+            const { id, ...data } = validation.data;
+            const newId = id || Date.now().toString() + i;
+            const docRef = doc(firestore, 'memberships', newId);
+
+            const docData = {
               id: newId,
-              ...validation.data,
-              points: validation.data.points || 0,
-              joinDate: validation.data.joinDate ? Timestamp.fromDate(new Date(validation.data.joinDate)) : Timestamp.now(),
-              dob: validation.data.dob ? Timestamp.fromDate(new Date(validation.data.dob)) : Timestamp.now(),
-              expiryDate: validation.data.expiryDate ? Timestamp.fromDate(new Date(validation.data.expiryDate)) : Timestamp.now(),
+              ...data,
+              points: data.points || 0,
+              joinDate: data.joinDate ? Timestamp.fromDate(new Date(data.joinDate)) : Timestamp.now(),
+              dob: data.dob ? Timestamp.fromDate(new Date(data.dob)) : Timestamp.now(),
+              expiryDate: data.expiryDate ? Timestamp.fromDate(new Date(data.expiryDate)) : Timestamp.now(),
               status: 'Checked Out' as MemberStatus,
-            });
+            };
+            
+            // Using setDoc with merge:true to either create or overwrite.
+            // Be cautious with this in production if you don't want to overwrite.
+            setDocumentNonBlocking(docRef, docData, { merge: true });
             successfulImports++;
           } catch (error: any) {
             errors.push(`Row ${i + 2}: Failed to import - ${error.message}`);
@@ -172,8 +172,8 @@ export function ImportExportTool() {
   };
   
   const downloadTemplate = () => {
-    const headers = 'fullName,email,tier,points,phone,address,dob,joinDate,expiryDate';
-    const exampleRow = `"John Doe",john.doe@example.com,Gold,1500,"123-456-7890","123 Casino St","1990-01-15T00:00:00.000Z","2023-01-01T00:00:00.000Z","2025-01-01T00:00:00.000Z"`;
+    const headers = 'id,fullName,email,tier,points,phone,address,dob,joinDate,expiryDate';
+    const exampleRow = `MEM-12345,"John Doe",john.doe@example.com,Gold,1500,"123-456-7890","123 Casino St","1990-01-15T00:00:00.000Z","2023-01-01T00:00:00.000Z","2025-01-01T00:00:00.000Z"`;
     const csvContent = "data:text/csv;charset=utf-8," + [headers, exampleRow].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -244,7 +244,7 @@ export function ImportExportTool() {
                     <CheckCircle className="h-4 w-4" />
                     <AlertTitle>Ready to Import</AlertTitle>
                     <AlertDescription>
-                       Please use the template for the correct format. Required columns are: fullName, email, tier, and points. All dates should be in ISO 8601 format (e.g., YYYY-MM-DDTHH:mm:ss.sssZ).
+                       The `id` column is optional; if omitted, a new ID will be generated. All dates should be in ISO 8601 format (e.g., YYYY-MM-DDTHH:mm:ss.sssZ).
                     </AlertDescription>
                 </Alert>
              )}
@@ -253,3 +253,5 @@ export function ImportExportTool() {
     </div>
   );
 }
+
+    
