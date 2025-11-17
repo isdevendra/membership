@@ -5,13 +5,14 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Download, Upload, FileText, AlertTriangle, CheckCircle } from 'lucide-react';
-import { useCollection, useFirestore, addDocumentNonBlocking } from '@/firebase';
+import { useCollection, useFirestore, addDocumentNonBlocking, useMemoFirebase } from '@/firebase';
 import { collection, Timestamp } from 'firebase/firestore';
 import { type Member, MemberTier, MemberStatus } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
 import { z } from 'zod';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { toDate } from '@/lib/utils';
 
 const memberImportSchema = z.object({
   fullName: z.string().min(2),
@@ -31,7 +32,7 @@ const memberImportSchema = z.object({
 
 export function ImportExportTool() {
   const firestore = useFirestore();
-  const membersCollectionRef = firestore ? collection(firestore, 'memberships') : null;
+  const membersCollectionRef = useMemoFirebase(() => (firestore ? collection(firestore, 'memberships') : null), [firestore]);
   const { data: members, isLoading: isLoadingMembers } = useCollection<Member>(membersCollectionRef);
 
   const [isImporting, setIsImporting] = useState(false);
@@ -52,6 +53,10 @@ export function ImportExportTool() {
     const csvRows = [
       headers.join(','),
       ...members.map(member => {
+        const joinDate = toDate(member.joinDate);
+        const expiryDate = toDate(member.expiryDate);
+        const dob = toDate(member.dob);
+
         const row = [
           member.id,
           `"${member.fullName.replace(/"/g, '""')}"`,
@@ -60,19 +65,19 @@ export function ImportExportTool() {
           member.points,
           `"${member.phone || ''}"`,
           `"${(member.address || '').replace(/"/g, '""').replace(/\\n/g, ' ')}"`,
-          member.dob ? new Date(member.dob.toString()).toISOString() : '',
+          dob ? dob.toISOString() : '',
           member.gender || '',
           member.nationality || '',
           member.governmentId || '',
-          member.joinDate ? new Date(member.joinDate.toString()).toISOString() : '',
-          member.expiryDate ? new Date(member.expiryDate.toString()).toISOString() : '',
+          joinDate ? joinDate.toISOString() : '',
+          expiryDate ? expiryDate.toISOString() : '',
           member.status || 'Checked Out'
         ];
         return row.join(',');
       })
     ];
 
-    const csvContent = "data:text/csv;charset=utf-s8," + csvRows.join('\\n');
+    const csvContent = "data:text/csv;charset=utf-8," + csvRows.join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -86,7 +91,7 @@ export function ImportExportTool() {
   
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !firestore) return;
+    if (!file || !firestore || !membersCollectionRef) return;
   
     setIsImporting(true);
     setImportProgress(0);
@@ -95,14 +100,17 @@ export function ImportExportTool() {
     const reader = new FileReader();
     reader.onload = async (e) => {
       const text = e.target?.result as string;
-      const rows = text.split('\\n').slice(1); // Skip header
+      const rows = text.split('\n').slice(1); // Skip header
       const totalRows = rows.length;
       let successfulImports = 0;
       const errors: string[] = [];
   
       for (let i = 0; i < totalRows; i++) {
-        const row = rows[i].split(',');
-        if (row.length < 4) continue; // Basic validation
+        const rowText = rows[i].trim();
+        if (!rowText) continue;
+
+        // Basic CSV parsing, not robust for all cases (e.g. commas in fields)
+        const row = rowText.split(',');
   
         const rowData = {
           fullName: row[0]?.replace(/"/g, ''),
@@ -122,11 +130,10 @@ export function ImportExportTool() {
           errors.push(`Row ${i + 2}: ${validation.error.errors.map(e => e.message).join(', ')}`);
         } else {
           try {
-            if (!membersCollectionRef) throw new Error("Collection reference not available.");
             
             const newId = Date.now().toString() + i;
             
-            await addDocumentNonBlocking(membersCollectionRef, {
+            addDocumentNonBlocking(membersCollectionRef, {
               id: newId,
               ...validation.data,
               points: validation.data.points || 0,
@@ -149,7 +156,7 @@ export function ImportExportTool() {
       if (successfulImports > 0) {
         toast({
           title: 'Import Complete',
-          description: `Successfully imported ${successfulImports} of ${totalRows} members.`,
+          description: `Successfully imported ${successfulImports} of ${totalRows > 0 ? totalRows -1 : 0} members.`,
         });
       }
       if (errors.length > 0) {
@@ -167,7 +174,7 @@ export function ImportExportTool() {
   const downloadTemplate = () => {
     const headers = 'fullName,email,tier,points,phone,address,dob,joinDate,expiryDate';
     const exampleRow = `"John Doe",john.doe@example.com,Gold,1500,"123-456-7890","123 Casino St","1990-01-15T00:00:00.000Z","2023-01-01T00:00:00.000Z","2025-01-01T00:00:00.000Z"`;
-    const csvContent = "data:text/csv;charset=utf-8," + [headers, exampleRow].join('\\n');
+    const csvContent = "data:text/csv;charset=utf-8," + [headers, exampleRow].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -219,7 +226,7 @@ export function ImportExportTool() {
                     <Progress value={importProgress} />
                 </div>
              )}
-             {importErrors.length > 0 && (
+             {importErrors.length > 0 && !isImporting && (
                 <Alert variant="destructive">
                     <AlertTriangle className="h-4 w-4" />
                     <AlertTitle>Import Failed</AlertTitle>
