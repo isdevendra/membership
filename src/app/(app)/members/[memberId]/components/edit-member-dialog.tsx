@@ -25,7 +25,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Camera, Pencil, Upload } from 'lucide-react';
+import { Camera, Pencil, Upload, Scan, Crop } from 'lucide-react';
 import { type Member, MemberTier } from '@/lib/types';
 import { useFirestore, updateDocumentNonBlocking } from '@/firebase';
 import { doc } from 'firebase/firestore';
@@ -225,7 +225,7 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
                 <FormLabel>Member Photo</FormLabel>
                 <FormControl>
                     <div className="flex flex-col items-center gap-4">
-                    <Avatar className="w-40 h-40 border">
+                    <Avatar className="w-40 h-40 border aspect-[3/4] object-cover">
                         <AvatarImage src={photo || undefined} alt="Member photo" />
                         <AvatarFallback className="text-3xl">?</AvatarFallback>
                     </Avatar>
@@ -447,8 +447,16 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
                                         <div className="w-full aspect-video border rounded-md bg-muted flex items-center justify-center overflow-hidden">
                                             {idFront ? <Image src={idFront} alt="ID Front" width={200} height={126} className="object-contain"/> : <span className="text-muted-foreground text-sm">Preview</span>}
                                         </div>
-                                        <Button type="button" className="w-full" onClick={() => document.getElementById('id-front-upload-edit')?.click()}>
-                                            <Upload className="mr-2 h-4 w-4" /> Upload Front
+                                        <div className="flex gap-2 w-full">
+                                            <Button type="button" className="flex-1" onClick={() => document.getElementById('id-front-upload-edit')?.click()}>
+                                                <Upload className="mr-2 h-4 w-4" /> Upload
+                                            </Button>
+                                            <Button type="button" variant="outline" className="flex-1" disabled>
+                                                <Scan className="mr-2 h-4 w-4" /> Scan
+                                            </Button>
+                                        </div>
+                                        <Button type="button" variant="secondary" className="w-full" disabled={!idFront}>
+                                            <Crop className="mr-2 h-4 w-4" /> Crop Image
                                         </Button>
                                         <Input id="id-front-upload-edit" type="file" accept="image/jpeg, image/jpg, image/png" className="hidden" onChange={(e) => handleFileChange(e, setIdFront, 'idFront')} />
                                     </div>
@@ -468,8 +476,16 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
                                         <div className="w-full aspect-video border rounded-md bg-muted flex items-center justify-center overflow-hidden">
                                             {idBack ? <Image src={idBack} alt="ID Back" width={200} height={126} className="object-contain" /> : <span className="text-muted-foreground text-sm">Preview</span>}
                                         </div>
-                                        <Button type="button" className="w-full" onClick={() => document.getElementById('id-back-upload-edit')?.click()}>
-                                            <Upload className="mr-2 h-4 w-4" /> Upload Back
+                                        <div className="flex gap-2 w-full">
+                                           <Button type="button" className="flex-1" onClick={() => document.getElementById('id-back-upload-edit')?.click()}>
+                                               <Upload className="mr-2 h-4 w-4" /> Upload
+                                           </Button>
+                                           <Button type="button" variant="outline" className="flex-1" disabled>
+                                                <Scan className="mr-2 h-4 w-4" /> Scan
+                                            </Button>
+                                        </div>
+                                        <Button type="button" variant="secondary" className="w-full" disabled={!idBack}>
+                                            <Crop className="mr-2 h-4 w-4" /> Crop Image
                                         </Button>
                                         <Input id="id-back-upload-edit" type="file" accept="image/jpeg, image/jpg, image/png" className="hidden" onChange={(e) => handleFileChange(e, setIdBack, 'idBack')} />
                                     </div>
@@ -493,3 +509,5 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
     </Dialog>
   );
 }
+
+    
