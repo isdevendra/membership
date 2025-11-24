@@ -7,8 +7,9 @@ import { z } from "zod";
 import { format } from "date-fns";
 import { CalendarIcon, UserPlus, Camera, Upload, Scan, Crop } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import QRCode from "react-qr-code";
+import { type Member } from "@/lib/types";
 
 import { cn, toDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -33,8 +34,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useFirestore, setDocumentNonBlocking } from "@/firebase";
-import { collection, doc, Timestamp } from "firebase/firestore";
+import { useFirestore, setDocumentNonBlocking, useCollection, useMemoFirebase } from "@/firebase";
+import { collection, doc, Timestamp, query, orderBy, limit } from "firebase/firestore";
 import {
   Dialog,
   DialogContent,
@@ -83,6 +84,20 @@ export function EnrollmentForm() {
   const firestore = useFirestore();
   const [enrollmentSuccess, setEnrollmentSuccess] = useState(false);
   const [newMember, setNewMember] = useState<{id: string, name: string} | null>(null);
+
+  const lastMemberQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'memberships'), orderBy('joinDate', 'desc'), limit(1));
+  }, [firestore]);
+
+  const { data: lastMembers, isLoading: isLoadingLastMember } = useCollection<Member>(lastMemberQuery);
+
+  const lastMemberId = useMemo(() => {
+    if (lastMembers && lastMembers.length > 0) {
+      return lastMembers[0].id;
+    }
+    return null;
+  }, [lastMembers]);
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -267,7 +282,14 @@ export function EnrollmentForm() {
                         name="memberId"
                         render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Membership ID</FormLabel>
+                            <div className="flex items-center justify-between">
+                                <FormLabel>Membership ID</FormLabel>
+                                {lastMemberId && (
+                                    <span className="text-xs text-muted-foreground">
+                                        Last ID: {lastMemberId}
+                                    </span>
+                                )}
+                            </div>
                             <FormControl>
                             <Input placeholder="e.g., CASINO-12345" {...field} />
                             </FormControl>
@@ -609,7 +631,5 @@ export function EnrollmentForm() {
     </>
   );
 }
-
-    
 
     
