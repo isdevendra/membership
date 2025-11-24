@@ -225,7 +225,7 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
                 <FormLabel>Member Photo</FormLabel>
                 <FormControl>
                     <div className="flex flex-col items-center gap-4">
-                    <Avatar className="w-40 h-40 border aspect-[3/4] object-cover">
+                    <Avatar className="w-40 h-auto border aspect-[3/4] object-cover">
                         <AvatarImage src={photo || undefined} alt="Member photo" />
                         <AvatarFallback className="text-3xl">?</AvatarFallback>
                     </Avatar>
@@ -509,5 +509,7 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
     </Dialog>
   );
 }
+
+    
 
     

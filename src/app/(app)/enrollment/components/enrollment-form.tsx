@@ -48,6 +48,7 @@ import Image from "next/image";
 
 
 const formSchema = z.object({
+  memberId: z.string().min(1, "Membership ID is required."),
   fullName: z.string().min(2, {
     message: "Full name must be at least 2 characters.",
   }),
@@ -86,6 +87,7 @@ export function EnrollmentForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      memberId: "",
       fullName: "",
       email: "",
       phone: "",
@@ -137,9 +139,10 @@ export function EnrollmentForm() {
         return;
     }
 
-    const newId = Date.now().toString();
+    const newId = values.memberId;
+    const { memberId, ...restOfValues } = values;
     const finalValues = { 
-        ...values,
+        ...restOfValues,
         id: newId, 
         photo, 
         idFront, 
@@ -218,7 +221,7 @@ export function EnrollmentForm() {
                         <FormLabel>Member Photo</FormLabel>
                         <FormControl>
                           <div className="flex flex-col items-center gap-4">
-                            <Avatar className="w-40 h-40 border aspect-[3/4] object-cover">
+                            <Avatar className="w-40 h-auto border aspect-[3/4] object-cover">
                               <AvatarImage src={photo || undefined} alt="Member photo" />
                               <AvatarFallback className="text-3xl">?</AvatarFallback>
                             </Avatar>
@@ -259,6 +262,19 @@ export function EnrollmentForm() {
                 </div>
 
                 <div className="space-y-4 md:col-span-2">
+                    <FormField
+                        control={form.control}
+                        name="memberId"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Membership ID</FormLabel>
+                            <FormControl>
+                            <Input placeholder="e.g., CASINO-12345" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
                   <FormField
                     control={form.control}
                     name="fullName"
@@ -593,5 +609,7 @@ export function EnrollmentForm() {
     </>
   );
 }
+
+    
 
     
