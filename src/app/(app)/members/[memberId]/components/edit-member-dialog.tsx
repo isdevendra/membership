@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
@@ -40,6 +39,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import Image from 'next/image';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
+// For now, we'll assume the current user is an Admin for demonstration purposes.
+const currentUserRole = 'Admin';
+
+
 const toDate = (dateValue: any): Date | null => {
     if (!dateValue) return null;
     if (dateValue.toDate) { // Firestore Timestamp
@@ -58,6 +61,7 @@ const toDate = (dateValue: any): Date | null => {
 };
 
 const formSchema = z.object({
+  id: z.string().min(1, "Membership ID is required."),
   fullName: z.string().min(2, "Full name must be at least 2 characters."),
   email: z.string().email("Please enter a valid email address."),
   phone: z.string().min(1, "Phone number is required."),
@@ -99,6 +103,7 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
   useEffect(() => {
     if (member && isOpen) {
       form.reset({
+        id: member.id,
         fullName: member.fullName,
         email: member.email,
         phone: member.phone,
@@ -184,12 +189,23 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
       return;
     }
 
+    if (values.id !== member.id) {
+        // NOTE: Changing a document ID is a destructive operation that requires
+        // creating a new document and deleting the old one, including migrating subcollections.
+        // This should be handled by a secure backend Cloud Function.
+        toast({
+            title: "ID Change (Simulated)",
+            description: `ID change from ${member.id} to ${values.id} requires a backend function. For now, only other fields will be updated.`,
+        });
+        // We proceed to update the other fields on the original document.
+    }
+
     const memberDocRef = doc(firestore, 'memberships', member.id);
-    const updatedValues = { ...values, photo, idFront, idBack };
+    const { id, ...updatedValues } = { ...values, photo, idFront, idBack };
     
     updateDocumentNonBlocking(memberDocRef, updatedValues);
 
-    onUpdate(updatedValues);
+    onUpdate({ ...updatedValues, id: member.id }); // Pass original ID back
 
     toast({
       title: 'Member Updated',
@@ -251,7 +267,7 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
                                 <Button type="button" className="flex-1" onClick={() => document.getElementById('photo-upload-edit')?.click()}>
                                 <Upload className="mr-2 h-4 w-4" /> Upload
                                 </Button>
-                                <Input id="photo-upload-edit" type="file" accept="image/jpeg, image/jpg, image/png" className="hidden" onChange={(e) => handleFileChange(e, setPhoto, 'photo')} />
+                                <Input id="photo-upload-edit" type="file" accept="image/png, image/jpeg, image/jpg" className="hidden" onChange={(e) => handleFileChange(e, setPhoto, 'photo')} />
                                 <Button type="button" variant="outline" className="flex-1" onClick={() => setShowCamera(true)}>
                                 <Camera className="mr-2 h-4 w-4" /> Camera
                                 </Button>
@@ -262,6 +278,23 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
                 <FormMessage />
                 </FormItem>
             )}
+            />
+
+            <FormField
+              control={form.control}
+              name="id"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Membership ID</FormLabel>
+                  <FormControl>
+                    <Input {...field} disabled={currentUserRole !== 'Admin'} />
+                  </FormControl>
+                   {currentUserRole !== 'Admin' && (
+                        <p className="text-xs text-muted-foreground">Only Admins can edit the Membership ID.</p>
+                    )}
+                  <FormMessage />
+                </FormItem>
+              )}
             />
 
             <FormField
@@ -458,7 +491,7 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
                                         <Button type="button" variant="secondary" className="w-full" disabled={!idFront}>
                                             <Crop className="mr-2 h-4 w-4" /> Crop Image
                                         </Button>
-                                        <Input id="id-front-upload-edit" type="file" accept="image/jpeg, image/jpg, image/png" className="hidden" onChange={(e) => handleFileChange(e, setIdFront, 'idFront')} />
+                                        <Input id="id-front-upload-edit" type="file" accept="image/png, image/jpeg, image/jpg" className="hidden" onChange={(e) => handleFileChange(e, setIdFront, 'idFront')} />
                                     </div>
                                 </FormControl>
                                 <FormMessage />
@@ -487,7 +520,7 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
                                         <Button type="button" variant="secondary" className="w-full" disabled={!idBack}>
                                             <Crop className="mr-2 h-4 w-4" /> Crop Image
                                         </Button>
-                                        <Input id="id-back-upload-edit" type="file" accept="image/jpeg, image/jpg, image/png" className="hidden" onChange={(e) => handleFileChange(e, setIdBack, 'idBack')} />
+                                        <Input id="id-back-upload-edit" type="file" accept="image/png, image/jpeg, image/jpg" className="hidden" onChange={(e) => handleFileChange(e, setIdBack, 'idBack')} />
                                     </div>
                                 </FormControl>
                                 <FormMessage />
