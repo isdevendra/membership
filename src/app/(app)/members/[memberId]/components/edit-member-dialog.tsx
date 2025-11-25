@@ -27,7 +27,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Camera, Pencil, Upload, Scan, Crop } from 'lucide-react';
 import { type Member, MemberTier } from '@/lib/types';
 import { useFirestore, updateDocumentNonBlocking } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { doc, Timestamp } from 'firebase/firestore';
 import { toast } from '@/hooks/use-toast';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -197,15 +197,30 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
             title: "ID Change (Simulated)",
             description: `ID change from ${member.id} to ${values.id} requires a backend function. For now, only other fields will be updated.`,
         });
-        // We proceed to update the other fields on the original document.
     }
 
     const memberDocRef = doc(firestore, 'memberships', member.id);
-    const { id, ...updatedValues } = { ...values, photo, idFront, idBack };
     
-    updateDocumentNonBlocking(memberDocRef, updatedValues);
+    // Create a clean object for the update, excluding the 'id' and any undefined image fields.
+    const { id, ...formValues } = values;
+    const updatedData: Partial<Member> = {
+      ...formValues,
+      dob: Timestamp.fromDate(values.dob),
+      expiryDate: Timestamp.fromDate(values.expiryDate),
+      photo: photo || member.photo || '', // Use new, old, or empty string
+    };
 
-    onUpdate({ ...updatedValues, id: member.id }); // Pass original ID back
+    // Only include idFront and idBack if they have a value.
+    if (idFront !== undefined) {
+      updatedData.idFront = idFront || '';
+    }
+    if (idBack !== undefined) {
+      updatedData.idBack = idBack || '';
+    }
+
+    updateDocumentNonBlocking(memberDocRef, updatedData);
+
+    onUpdate({ ...updatedData, id: member.id }); // Pass original ID back
 
     toast({
       title: 'Member Updated',
@@ -542,7 +557,3 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
     </Dialog>
   );
 }
-
-    
-
-    
