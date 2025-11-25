@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -263,7 +264,7 @@ const SidebarTrigger = React.forwardRef<
   React.ElementRef<typeof Button>,
   React.ComponentProps<typeof Button>
 >(({ className, onClick, ...props }, ref) => {
-  const { toggleSidebar } = useSidebar()
+  const { toggleSidebar, state } = useSidebar()
 
   return (
     <Button
@@ -271,7 +272,10 @@ const SidebarTrigger = React.forwardRef<
       data-sidebar="trigger"
       variant="ghost"
       size="icon"
-      className={cn("h-7 w-7", className)}
+      className={cn("absolute top-2.5 z-50 h-7 w-7", 
+        state === 'expanded' ? 'right-2' : 'left-1/2 -translate-x-1/2',
+        className
+    )}
       onClick={(event) => {
         onClick?.(event)
         toggleSidebar()
@@ -358,7 +362,7 @@ const SidebarHeader = React.forwardRef<
     <div
       ref={ref}
       data-sidebar="header"
-      className={cn("flex flex-col gap-2 p-2", className)}
+      className={cn("flex flex-col gap-2 p-2 pt-10", className)}
       {...props}
     />
   )
