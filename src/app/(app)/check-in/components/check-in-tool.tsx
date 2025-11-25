@@ -45,6 +45,8 @@ export function CheckInTool() {
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannerRegionId = "qr-code-scanner";
+
 
   const memberSearchQuery = useMemoFirebase(() => {
     if (!firestore || !searchTerm || !searchedMember) return null;
@@ -77,8 +79,8 @@ export function CheckInTool() {
 
   useEffect(() => {
     if (isScannerOpen) {
-      const qrCodeRegionId = "qr-code-scanner";
-      scannerRef.current = new Html5Qrcode(qrCodeRegionId);
+      // Initialize the scanner
+      scannerRef.current = new Html5Qrcode(scannerRegionId);
       const startScanner = async () => {
         try {
           await scannerRef.current?.start(
@@ -88,16 +90,15 @@ export function CheckInTool() {
               qrbox: { width: 250, height: 250 },
             },
             (decodedText, decodedResult) => {
-              // On success
               handleQrCodeSuccess(decodedText);
               setIsScannerOpen(false); // Close dialog on successful scan
             },
             (errorMessage) => {
-              // On error, we can ignore it for continuous scanning
+              // Ignore errors for continuous scanning
             }
           );
         } catch (err) {
-          console.error("QR Scanner Error:", err);
+          console.error("QR Scanner Start Error:", err);
           toast({
               variant: 'destructive',
               title: "Scanner Error",
@@ -105,10 +106,13 @@ export function CheckInTool() {
           });
         }
       };
-      startScanner();
+      // We need a small delay to ensure the DOM element is ready
+      const timer = setTimeout(startScanner, 100);
+      return () => clearTimeout(timer);
     } else {
+        // Cleanup function to stop the scanner
         const stopScanner = async () => {
-            if (scannerRef.current && scannerRef.current.getState() === Html5QrcodeScannerState.SCANNING) {
+            if (scannerRef.current && scannerRef.current.isScanning) {
                 try {
                     await scannerRef.current.stop();
                 } catch (err) {
@@ -118,20 +122,8 @@ export function CheckInTool() {
         }
         stopScanner();
     }
-
-    return () => {
-        const stopScanner = async () => {
-             if (scannerRef.current && scannerRef.current.getState() === Html5QrcodeScannerState.SCANNING) {
-                try {
-                    await scannerRef.current.stop();
-                } catch(e) {
-                    // Ignore errors on cleanup
-                }
-            }
-        }
-        stopScanner();
-    };
   }, [isScannerOpen]);
+
 
   const handleQrCodeSuccess = (decodedText: string) => {
     try {
@@ -257,7 +249,7 @@ export function CheckInTool() {
                             Position the member's QR code within the frame to automatically check them in.
                         </DialogDescription>
                       </DialogHeader>
-                      <div id="qr-code-scanner" className="w-full rounded-md overflow-hidden aspect-square"></div>
+                      <div id={scannerRegionId} className="w-full rounded-md overflow-hidden aspect-square"></div>
                       <DialogFooter>
                           <Button variant="outline" onClick={() => setIsScannerOpen(false)}>Cancel</Button>
                       </DialogFooter>
@@ -354,5 +346,3 @@ export function CheckInTool() {
     </div>
   );
 }
-
-    
