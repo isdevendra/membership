@@ -108,10 +108,9 @@ export function AppSidebar() {
           <span className="text-lg font-semibold font-headline text-sidebar-foreground">
             Membership
           </span>
-          <div className="grow" />
-          <SidebarTrigger />
         </div>
       </SidebarHeader>
+      <SidebarTrigger />
       <SidebarContent>
         <SidebarMenu>
           {menuItems.map((item) => (
