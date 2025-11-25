@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
@@ -207,17 +208,11 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
       ...formValues,
       dob: Timestamp.fromDate(values.dob),
       expiryDate: Timestamp.fromDate(values.expiryDate),
-      photo: photo || member.photo || '', // Use new, old, or empty string
+      photo: photo || member.photo || '',
+      idFront: idFront || member.idFront || '',
+      idBack: idBack || member.idBack || '',
     };
-
-    // Only include idFront and idBack if they have a value.
-    if (idFront !== undefined) {
-      updatedData.idFront = idFront || '';
-    }
-    if (idBack !== undefined) {
-      updatedData.idBack = idBack || '';
-    }
-
+    
     updateDocumentNonBlocking(memberDocRef, updatedData);
 
     onUpdate({ ...updatedData, id: member.id }); // Pass original ID back
