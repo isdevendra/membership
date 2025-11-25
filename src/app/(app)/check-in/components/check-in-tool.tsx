@@ -1,9 +1,10 @@
 
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { Search, LogIn, LogOut, History, UserCheck, UserX } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Search, LogIn, LogOut, History, UserCheck, UserX, ScanLine } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
+import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,10 +12,19 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
+import { useCollection, useDoc, useFirestore, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
 import { collection, doc, query, where, limit, orderBy } from 'firebase/firestore';
 import { type Member, type CheckIn } from '@/lib/types';
 import { toast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 
 const toDate = (dateValue: any): Date | null => {
     if (!dateValue) return null;
@@ -30,8 +40,11 @@ const toDate = (dateValue: any): Date | null => {
 export function CheckInTool() {
   const firestore = useFirestore();
   const [searchTerm, setSearchTerm] = useState('');
+  const [scannedMemberId, setScannedMemberId] = useState<string | null>(null);
   const [searchedMember, setSearchedMember] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
 
   const memberSearchQuery = useMemoFirebase(() => {
     if (!firestore || !searchTerm || !searchedMember) return null;
@@ -39,6 +52,14 @@ export function CheckInTool() {
   }, [firestore, searchTerm, searchedMember]);
 
   const { data: foundMembers, isLoading: isLoadingMembers } = useCollection<Member>(memberSearchQuery);
+  
+  const scannedMemberDocRef = useMemoFirebase(() => {
+    if (!firestore || !scannedMemberId) return null;
+    return doc(firestore, 'memberships', scannedMemberId);
+  }, [firestore, scannedMemberId]);
+
+  const { data: scannedMember, isLoading: isLoadingScannedMember } = useDoc<Member>(scannedMemberDocRef);
+
 
   const checkInsQuery = useMemoFirebase(() => {
     if (!firestore || !selectedMember) return null;
@@ -50,8 +71,91 @@ export function CheckInTool() {
   const handleSearch = () => {
     if (searchTerm.trim()) {
       setSearchedMember(true);
+      setScannedMemberId(null);
     }
   };
+
+  useEffect(() => {
+    if (isScannerOpen) {
+      const qrCodeRegionId = "qr-code-scanner";
+      scannerRef.current = new Html5Qrcode(qrCodeRegionId);
+      const startScanner = async () => {
+        try {
+          await scannerRef.current?.start(
+            { facingMode: "environment" },
+            {
+              fps: 10,
+              qrbox: { width: 250, height: 250 },
+            },
+            (decodedText, decodedResult) => {
+              // On success
+              handleQrCodeSuccess(decodedText);
+              setIsScannerOpen(false); // Close dialog on successful scan
+            },
+            (errorMessage) => {
+              // On error, we can ignore it for continuous scanning
+            }
+          );
+        } catch (err) {
+          console.error("QR Scanner Error:", err);
+          toast({
+              variant: 'destructive',
+              title: "Scanner Error",
+              description: "Could not start the camera. Please check permissions."
+          });
+        }
+      };
+      startScanner();
+    } else {
+        const stopScanner = async () => {
+            if (scannerRef.current && scannerRef.current.getState() === Html5QrcodeScannerState.SCANNING) {
+                try {
+                    await scannerRef.current.stop();
+                } catch (err) {
+                    console.error("Error stopping scanner:", err);
+                }
+            }
+        }
+        stopScanner();
+    }
+
+    return () => {
+        const stopScanner = async () => {
+             if (scannerRef.current && scannerRef.current.getState() === Html5QrcodeScannerState.SCANNING) {
+                try {
+                    await scannerRef.current.stop();
+                } catch(e) {
+                    // Ignore errors on cleanup
+                }
+            }
+        }
+        stopScanner();
+    };
+  }, [isScannerOpen]);
+
+  const handleQrCodeSuccess = (decodedText: string) => {
+    try {
+      // Assuming QR code contains the URL to the member's profile
+      const url = new URL(decodedText);
+      const pathParts = url.pathname.split('/');
+      const memberId = pathParts[pathParts.length - 1];
+
+      if (memberId) {
+        setScannedMemberId(memberId);
+        setSearchTerm(''); // Clear manual search
+      } else {
+        throw new Error("No member ID found in QR code.");
+      }
+    } catch (error) {
+      console.error("Error parsing QR code:", error);
+      toast({
+        variant: "destructive",
+        title: "Invalid QR Code",
+        description: "The scanned QR code does not contain a valid member profile link.",
+      });
+    }
+  };
+
 
   React.useEffect(() => {
     if (searchedMember && !isLoadingMembers) {
@@ -62,28 +166,36 @@ export function CheckInTool() {
         toast({
           variant: 'destructive',
           title: "Member not found",
-          description: "No member found with that name or ID. Please try again.",
+          description: "No member found with that name. Please try again.",
         });
       }
       setSearchedMember(false);
     }
   }, [foundMembers, isLoadingMembers, searchedMember]);
+  
+  useEffect(() => {
+    if (scannedMember && scannedMemberId) {
+        setSelectedMember(scannedMember);
+        handleCheckIn(scannedMember); // Automatically check in on scan
+        setScannedMemberId(null); // Reset for next scan
+    }
+  }, [scannedMember, scannedMemberId]);
 
-  const handleCheckIn = () => {
-    if (!firestore || !selectedMember) return;
+  const handleCheckIn = (memberToCheckIn: Member) => {
+    if (!firestore || !memberToCheckIn || memberToCheckIn.status === 'Checked In') return;
 
-    const memberDocRef = doc(firestore, 'memberships', selectedMember.id);
-    const checkinColRef = collection(firestore, 'memberships', selectedMember.id, 'checkins');
+    const memberDocRef = doc(firestore, 'memberships', memberToCheckIn.id);
+    const checkinColRef = collection(firestore, 'memberships', memberToCheckIn.id, 'checkins');
     const newStatus = 'Checked In';
     
     updateDocumentNonBlocking(memberDocRef, { status: newStatus });
     addDocumentNonBlocking(checkinColRef, {
-        memberId: selectedMember.id,
+        memberId: memberToCheckIn.id,
         checkInTime: new Date().toISOString(),
     });
 
-    setSelectedMember(prev => prev ? { ...prev, status: newStatus } : null);
-    toast({ title: 'Check-in Successful', description: `${selectedMember.fullName} has been checked in.` });
+    setSelectedMember(prev => prev && prev.id === memberToCheckIn.id ? { ...prev, status: newStatus } : memberToCheckIn);
+    toast({ title: 'Check-in Successful', description: `${memberToCheckIn.fullName} has been checked in.` });
   };
   
   const handleCheckOut = async () => {
@@ -106,6 +218,8 @@ export function CheckInTool() {
     toast({ title: 'Check-out Successful', description: `${selectedMember.fullName} has been checked out.` });
   };
 
+  const isLoading = isLoadingMembers || isLoadingScannedMember;
+
   return (
     <div className="grid lg:grid-cols-3 gap-8">
       <div className="lg:col-span-1">
@@ -127,9 +241,28 @@ export function CheckInTool() {
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                 />
               </div>
-              <Button onClick={handleSearch} disabled={isLoadingMembers}>
-                {isLoadingMembers ? '...' : <Search className="h-4 w-4" />}
+              <Button onClick={handleSearch} disabled={isLoading}>
+                {isLoading ? '...' : <Search className="h-4 w-4" />}
               </Button>
+              <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="icon">
+                        <ScanLine className="h-4 w-4" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                      <DialogHeader>
+                          <DialogTitle>Scan Member QR Code</DialogTitle>
+                           <DialogDescription>
+                            Position the member's QR code within the frame to automatically check them in.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div id="qr-code-scanner" className="w-full rounded-md overflow-hidden aspect-square"></div>
+                      <DialogFooter>
+                          <Button variant="outline" onClick={() => setIsScannerOpen(false)}>Cancel</Button>
+                      </DialogFooter>
+                  </DialogContent>
+              </Dialog>
             </div>
             {selectedMember && (
               <Card className="mt-4">
@@ -155,7 +288,7 @@ export function CheckInTool() {
                         </Badge>
                    </div>
                   <div className="flex gap-2">
-                    <Button className="flex-1" onClick={handleCheckIn} disabled={selectedMember.status === 'Checked In'}>
+                    <Button className="flex-1" onClick={() => handleCheckIn(selectedMember)} disabled={selectedMember.status === 'Checked In'}>
                       <LogIn className="mr-2 h-4 w-4" /> Check In
                     </Button>
                     <Button className="flex-1" variant="outline" onClick={handleCheckOut} disabled={selectedMember.status !== 'Checked In'}>
@@ -189,7 +322,7 @@ export function CheckInTool() {
               </TableHeader>
               <TableBody>
                 {isLoadingCheckIns && <TableRow><TableCell colSpan={3} className="text-center">Loading activity...</TableCell></TableRow>}
-                {!isLoadingCheckIns && !selectedMember && <TableRow><TableCell colSpan={3} className="text-center">Search for a member to see their activity.</TableCell></TableRow>}
+                {!isLoadingCheckIns && !selectedMember && <TableRow><TableCell colSpan={3} className="text-center">Search or scan for a member to see their activity.</TableCell></TableRow>}
                 {!isLoadingCheckIns && selectedMember && checkIns?.length === 0 && <TableRow><TableCell colSpan={3} className="text-center">No recent activity found.</TableCell></TableRow>}
                 {!isLoadingCheckIns && checkIns?.map(activity => {
                     const checkInDate = toDate(activity.checkInTime);
