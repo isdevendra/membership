@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -42,8 +43,8 @@ type Role = 'Admin' | 'Receptionist' | 'Manager' | 'Security' | 'Member';
 
 const permissions: Record<Role, { createUser: boolean; deleteUser: boolean; editRole: boolean; }> = {
     Admin: { createUser: true, deleteUser: true, editRole: true },
-    Manager: { createUser: false, deleteUser: false, editRole: false },
-    Receptionist: { createUser: false, deleteUser: false, editRole: false },
+    Manager: { createUser: true, deleteUser: false, editRole: false },
+    Receptionist: { createUser: true, deleteUser: false, editRole: false },
     Security: { createUser: false, deleteUser: false, editRole: false },
     Member: { createUser: false, deleteUser: false, editRole: false },
 };
@@ -329,3 +330,5 @@ export default function AuthRolesPage() {
         </div>
     );
 }
+
+    
