@@ -79,48 +79,56 @@ export function CheckInTool() {
 
   useEffect(() => {
     if (isScannerOpen) {
-      // Initialize the scanner
-      scannerRef.current = new Html5Qrcode(scannerRegionId);
+      if (!scannerRef.current) {
+        scannerRef.current = new Html5Qrcode(scannerRegionId, /* verbose= */ false);
+      }
+      const qrCodeScanner = scannerRef.current;
+
       const startScanner = async () => {
         try {
-          await scannerRef.current?.start(
-            { facingMode: "environment" },
-            {
-              fps: 10,
-              qrbox: { width: 250, height: 250 },
-            },
+          if (qrCodeScanner.isScanning) {
+            await qrCodeScanner.stop();
+          }
+          await qrCodeScanner.start(
+            { facingMode: 'environment' },
+            { fps: 10, qrbox: { width: 250, height: 250 } },
             (decodedText, decodedResult) => {
+              // success callback
               handleQrCodeSuccess(decodedText);
               setIsScannerOpen(false); // Close dialog on successful scan
             },
             (errorMessage) => {
-              // Ignore errors for continuous scanning
+              // parse error callback, ignore.
             }
           );
         } catch (err) {
           console.error("QR Scanner Start Error:", err);
           toast({
-              variant: 'destructive',
-              title: "Scanner Error",
-              description: "Could not start the camera. Please check permissions."
+            variant: 'destructive',
+            title: 'Scanner Error',
+            description: 'Could not start the camera. Please check permissions.',
           });
         }
       };
-      // We need a small delay to ensure the DOM element is ready
+
       const timer = setTimeout(startScanner, 100);
-      return () => clearTimeout(timer);
+
+      return () => {
+        clearTimeout(timer);
+      };
     } else {
-        // Cleanup function to stop the scanner
-        const stopScanner = async () => {
-            if (scannerRef.current && scannerRef.current.isScanning) {
-                try {
-                    await scannerRef.current.stop();
-                } catch (err) {
-                    console.error("Error stopping scanner:", err);
-                }
-            }
+      const stopScanner = async () => {
+        if (scannerRef.current && scannerRef.current.isScanning) {
+          try {
+            await scannerRef.current.stop();
+          } catch (err) {
+            // This can sometimes throw an error if the scanner is already stopped.
+            // We can safely ignore it in the context of closing the dialog.
+            console.warn("Error stopping scanner (can be ignored):", err);
+          }
         }
-        stopScanner();
+      };
+      stopScanner();
     }
   }, [isScannerOpen]);
 
@@ -346,3 +354,5 @@ export function CheckInTool() {
     </div>
   );
 }
+
+    
