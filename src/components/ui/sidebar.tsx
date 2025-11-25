@@ -169,14 +169,29 @@ const Sidebar = React.forwardRef<
     {
       side = "left",
       variant = "sidebar",
-      collapsible = "offcanvas",
+      collapsible = "icon",
       className,
       children,
       ...props
     },
     ref
   ) => {
-    const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+    const { isMobile, state, openMobile, setOpenMobile, setOpen } = useSidebar()
+    const collapseTimer = React.useRef<NodeJS.Timeout | null>(null);
+
+    const handleMouseEnter = () => {
+      if (collapseTimer.current) {
+        clearTimeout(collapseTimer.current);
+        collapseTimer.current = null;
+      }
+      setOpen(true);
+    };
+
+    const handleMouseLeave = () => {
+      collapseTimer.current = setTimeout(() => {
+        setOpen(false);
+      }, 5000);
+    };
 
     if (collapsible === "none") {
       return (
@@ -225,6 +240,8 @@ const Sidebar = React.forwardRef<
         data-collapsible={state === "collapsed" ? collapsible : ""}
         data-variant={variant}
         data-side={side}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         {/* This is what handles the sidebar gap on desktop */}
         <div
@@ -255,6 +272,9 @@ const Sidebar = React.forwardRef<
             data-sidebar="sidebar"
             className="relative flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow"
           >
+            <div className="absolute top-2 right-2 z-20">
+                 <SidebarTrigger />
+            </div>
             {children}
           </div>
         </div>

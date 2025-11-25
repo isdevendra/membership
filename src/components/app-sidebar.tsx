@@ -27,7 +27,6 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarSeparator,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Logo } from "@/components/icons";
 import { useAuth } from "@/firebase";
@@ -110,7 +109,6 @@ export function AppSidebar() {
             Membership
           </span>
         </div>
-        <SidebarTrigger className="absolute top-3 right-2 group-data-[collapsible=icon]:hidden" />
       </SidebarHeader>
      
       <SidebarContent>
@@ -147,5 +145,6 @@ export function AppSidebar() {
 }
 
     
+
 
 
