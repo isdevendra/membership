@@ -83,6 +83,17 @@ interface EditMemberDialogProps {
   onUpdate: (updatedData: Partial<Member>) => void;
 }
 
+// Helper function to remove undefined properties from an object
+const removeUndefined = (obj: any) => {
+    const newObj: any = {};
+    for (const key in obj) {
+        if (obj[key] !== undefined) {
+            newObj[key] = obj[key];
+        }
+    }
+    return newObj;
+};
+
 export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
   const firestore = useFirestore();
   const [isOpen, setIsOpen] = React.useState(false);
@@ -202,20 +213,22 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
 
     const memberDocRef = doc(firestore, 'memberships', member.id);
     
-    // Create a clean object for the update, excluding the 'id' and any undefined image fields.
+    // Create a clean object for the update, excluding the 'id'
     const { id, ...formValues } = values;
     const updatedData: Partial<Member> = {
       ...formValues,
       dob: Timestamp.fromDate(values.dob),
       expiryDate: Timestamp.fromDate(values.expiryDate),
-      photo: photo || member.photo || '',
-      idFront: idFront || member.idFront || '',
-      idBack: idBack || member.idBack || '',
+      photo: photo || member.photo,
+      idFront: idFront || member.idFront,
+      idBack: idBack || member.idBack,
     };
     
-    updateDocumentNonBlocking(memberDocRef, updatedData);
+    const cleanData = removeUndefined(updatedData);
+    
+    updateDocumentNonBlocking(memberDocRef, cleanData);
 
-    onUpdate({ ...updatedData, id: member.id }); // Pass original ID back
+    onUpdate({ ...cleanData, id: member.id }); // Pass original ID back
 
     toast({
       title: 'Member Updated',
@@ -251,7 +264,7 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
                 <FormLabel>Member Photo</FormLabel>
                 <FormControl>
                     <div className="flex flex-col items-center gap-4">
-                    <Avatar className="w-40 h-auto border aspect-[3/4] object-cover">
+                    <Avatar className="w-auto h-40 border aspect-[3/4] object-cover">
                         <AvatarImage src={photo || undefined} alt="Member photo" />
                         <AvatarFallback className="text-3xl">?</AvatarFallback>
                     </Avatar>
@@ -552,3 +565,5 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
     </Dialog>
   );
 }
+
+    
