@@ -14,6 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
 import {
     Dialog,
@@ -26,7 +27,7 @@ import {
   } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useAuth, useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useAuth, useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
 import { createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { toast } from '@/hooks/use-toast';
 import { collection, doc, setDoc } from 'firebase/firestore';
@@ -36,17 +37,18 @@ import { Skeleton } from '@/components/ui/skeleton';
 type UserRecord = {
     id: string;
     email: string;
+    fullName: string;
     role: Role;
 };
 
 type Role = 'Admin' | 'Receptionist' | 'Manager' | 'Security' | 'Member';
 
-const permissions: Record<Role, { createUser: boolean; deleteUser: boolean; editRole: boolean; }> = {
-    Admin: { createUser: true, deleteUser: true, editRole: true },
-    Manager: { createUser: true, deleteUser: false, editRole: false },
-    Receptionist: { createUser: true, deleteUser: false, editRole: false },
-    Security: { createUser: false, deleteUser: false, editRole: false },
-    Member: { createUser: false, deleteUser: false, editRole: false },
+const permissions: Record<Role, { createUser: boolean; deleteUser: boolean; editRole: boolean; editUser: boolean }> = {
+    Admin: { createUser: true, deleteUser: true, editRole: true, editUser: true },
+    Manager: { createUser: true, deleteUser: false, editRole: false, editUser: true },
+    Receptionist: { createUser: true, deleteUser: false, editRole: false, editUser: false },
+    Security: { createUser: false, deleteUser: false, editRole: false, editUser: false },
+    Member: { createUser: false, deleteUser: false, editRole: false, editUser: false },
 };
 
 // For now, we'll assume the current user is an Admin for demonstration purposes.
@@ -76,6 +78,7 @@ function AddUserDialog({ onUserAdded }: { onUserAdded: (user: UserRecord) => voi
     const [isOpen, setIsOpen] = React.useState(false);
     const [email, setEmail] = React.useState('');
     const [password, setPassword] = React.useState('');
+    const [fullName, setFullName] = React.useState('');
     const [role, setRole] = React.useState<Role>('Member');
     const [isLoading, setIsLoading] = React.useState(false);
 
@@ -87,7 +90,7 @@ function AddUserDialog({ onUserAdded }: { onUserAdded: (user: UserRecord) => voi
             // and set their roles (custom claims) atomically and securely.
             // Creating users directly on the client should only be done with very strict security rules.
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            const newUser = { id: userCredential.user.uid, email: userCredential.user.email!, role };
+            const newUser = { id: userCredential.user.uid, email: userCredential.user.email!, fullName, role };
             
             // In a real app, you'd set the custom claim for the role on the backend here.
             // For now, we are managing roles in the client state.
@@ -97,7 +100,7 @@ function AddUserDialog({ onUserAdded }: { onUserAdded: (user: UserRecord) => voi
             await setDoc(memberDocRef, {
                 id: userCredential.user.uid,
                 email: userCredential.user.email,
-                fullName: userCredential.user.email, // Use email as placeholder
+                fullName: fullName || userCredential.user.email, // Use email as placeholder
                 tier: 'Bronze', // Default tier
                 points: 0,
                 joinDate: new Date().toISOString(),
@@ -117,6 +120,7 @@ function AddUserDialog({ onUserAdded }: { onUserAdded: (user: UserRecord) => voi
             setIsOpen(false);
             setEmail('');
             setPassword('');
+            setFullName('');
             setRole('Member');
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Error creating user', description: error.message });
@@ -148,6 +152,10 @@ function AddUserDialog({ onUserAdded }: { onUserAdded: (user: UserRecord) => voi
                         <Label htmlFor="email" className="text-right">Email</Label>
                         <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="col-span-3" />
                     </div>
+                     <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="fullName" className="text-right">Full Name</Label>
+                        <Input id="fullName" type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} className="col-span-3" />
+                    </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="password" className="text-right">Password</Label>
                         <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="col-span-3" />
@@ -170,6 +178,68 @@ function AddUserDialog({ onUserAdded }: { onUserAdded: (user: UserRecord) => voi
     );
 }
 
+function EditUserDialog({ user, children }: { user: UserRecord, children: React.ReactNode }) {
+    const firestore = useFirestore();
+    const [isOpen, setIsOpen] = React.useState(false);
+    const [fullName, setFullName] = React.useState(user.fullName);
+    const [isLoading, setIsLoading] = React.useState(false);
+
+    React.useEffect(() => {
+        if (isOpen) {
+            setFullName(user.fullName);
+        }
+    }, [isOpen, user.fullName]);
+    
+    const handleSaveChanges = () => {
+        if (!firestore) return;
+        setIsLoading(true);
+
+        const memberDocRef = doc(firestore, 'memberships', user.id);
+        updateDocumentNonBlocking(memberDocRef, { fullName });
+        
+        toast({
+            title: "User Updated",
+            description: `Full name for ${user.email} has been updated.`
+        });
+        setIsLoading(false);
+        setIsOpen(false);
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+            <DialogTrigger asChild>{children}</DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Edit User</DialogTitle>
+                    <DialogDescription>
+                        Editing details for {user.email}.
+                    </DialogDescription>
+                </DialogHeader>
+                 <div className="grid gap-4 py-4">
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="fullName" className="text-right">Full Name</Label>
+                        <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} className="col-span-3" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label className="text-right">Password</Label>
+                        <div className='col-span-3'>
+                            <Button variant="outline" size="sm" disabled>Send Password Reset</Button>
+                            <p className="text-xs text-muted-foreground mt-1">Password changes require a backend function.</p>
+                        </div>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+                    <Button onClick={handleSaveChanges} disabled={isLoading}>
+                        {isLoading ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+
 export default function AuthRolesPage() {
     const auth = useAuth();
     const firestore = useFirestore();
@@ -186,6 +256,7 @@ export default function AuthRolesPage() {
         return members.map(member => ({
             id: member.id,
             email: member.email,
+            fullName: member.fullName,
             // In a real app, role would come from custom claims or Firestore.
             // For now, we default everyone to "Member".
             role: 'Member'
@@ -266,7 +337,7 @@ export default function AuthRolesPage() {
             <Table>
                 <TableHeader>
                 <TableRow>
-                    <TableHead>User Email</TableHead>
+                    <TableHead>User (Name/Email)</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>
                     <span className="sr-only">Actions</span>
@@ -291,7 +362,10 @@ export default function AuthRolesPage() {
                     ) : (
                         users.map((user) => (
                             <TableRow key={user.id}>
-                                <TableCell className="font-medium">{user.email}</TableCell>
+                                <TableCell>
+                                    <div className="font-medium">{user.fullName}</div>
+                                    <div className="text-sm text-muted-foreground">{user.email}</div>
+                                </TableCell>
                                 <TableCell>
                                     <RoleSelector
                                         value={userRoles[user.id] || user.role}
@@ -309,7 +383,16 @@ export default function AuthRolesPage() {
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
                                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                        <DropdownMenuItem onClick={() => handleSaveChanges(user.id)}>Save Changes</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => handleSaveChanges(user.id)}>Save Role Change</DropdownMenuItem>
+                                        <EditUserDialog user={user}>
+                                             <DropdownMenuItem
+                                                onSelect={(e) => e.preventDefault()}
+                                                disabled={!permissions[currentUserRole].editUser}
+                                             >
+                                                Edit User
+                                            </DropdownMenuItem>
+                                        </EditUserDialog>
+                                        <DropdownMenuSeparator />
                                         <DropdownMenuItem
                                             onClick={() => handleRemoveUser(user.id, user.email)}
                                             disabled={!permissions[currentUserRole].deleteUser}
@@ -330,5 +413,7 @@ export default function AuthRolesPage() {
         </div>
     );
 }
+
+    
 
     
