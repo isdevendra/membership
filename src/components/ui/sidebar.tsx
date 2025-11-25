@@ -216,7 +216,11 @@ const Sidebar = React.forwardRef<
     return (
       <div
         ref={ref}
-        className="group peer hidden md:block text-sidebar-foreground"
+        className={cn("group peer hidden md:block text-sidebar-foreground",
+        "group-data-[collapsible=icon]:w-[--sidebar-width-icon]",
+        "group-data-[collapsible=icon]:p-0",
+        className
+        )}
         data-state={state}
         data-collapsible={state === "collapsed" ? collapsible : ""}
         data-variant={variant}
@@ -272,8 +276,8 @@ const SidebarTrigger = React.forwardRef<
       data-sidebar="trigger"
       variant="ghost"
       size="icon"
-      className={cn("absolute top-2.5 z-50 h-7 w-7", 
-        state === 'expanded' ? 'right-2' : 'left-1/2 -translate-x-1/2',
+      className={cn(
+        "h-7 w-7", 
         className
     )}
       onClick={(event) => {
@@ -362,7 +366,7 @@ const SidebarHeader = React.forwardRef<
     <div
       ref={ref}
       data-sidebar="header"
-      className={cn("flex flex-col gap-2 p-2 pt-10", className)}
+      className={cn("flex flex-col gap-2 p-2 pt-2", className)}
       {...props}
     />
   )

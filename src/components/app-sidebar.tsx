@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import Link from "next/link";
@@ -102,14 +103,14 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
-      <SidebarTrigger />
       <SidebarHeader>
         <div className="flex items-center gap-2 p-2">
           <Logo className="size-8 text-sidebar-primary" />
-          <span className="text-lg font-semibold font-headline text-sidebar-foreground">
+          <span className="text-lg font-semibold font-headline text-sidebar-foreground group-data-[collapsible=icon]:hidden">
             Membership
           </span>
         </div>
+        <SidebarTrigger className="absolute top-3 right-2 group-data-[collapsible=icon]:hidden" />
       </SidebarHeader>
      
       <SidebarContent>
@@ -123,7 +124,7 @@ export function AppSidebar() {
               >
                 <Link href={item.href}>
                   <item.icon />
-                  <span>{item.label}</span>
+                  <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -136,7 +137,7 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton onClick={handleSignOut} tooltip={{children: 'Sign Out'}}>
               <LogOut />
-              <span>Sign Out</span>
+              <span className="group-data-[collapsible=icon]:hidden">Sign Out</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -146,4 +147,5 @@ export function AppSidebar() {
 }
 
     
+
 
