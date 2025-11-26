@@ -30,8 +30,8 @@ import { Label } from '@/components/ui/label';
 import { useAuth, useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
 import { createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { toast } from '@/hooks/use-toast';
-import { collection, doc, setDoc } from 'firebase/firestore';
-import { type Member } from '@/lib/types';
+import { collection, doc, setDoc, Timestamp } from 'firebase/firestore';
+import { type Member, type MemberStatus, type MemberTier } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 
 type UserRecord = {
@@ -43,16 +43,16 @@ type UserRecord = {
 
 type Role = 'Admin' | 'Receptionist' | 'Manager' | 'Security' | 'Member';
 
-const permissions: Record<Role, { createUser: boolean; deleteUser: boolean; editRole: boolean; editUser: boolean }> = {
-    Admin: { createUser: true, deleteUser: true, editRole: true, editUser: true },
-    Manager: { createUser: true, deleteUser: false, editRole: false, editUser: true },
-    Receptionist: { createUser: true, deleteUser: false, editRole: false, editUser: false },
-    Security: { createUser: false, deleteUser: false, editRole: false, editUser: false },
-    Member: { createUser: false, deleteUser: false, editRole: false, editUser: false },
+export const permissions: Record<Role, { createUser: boolean; deleteUser: boolean; editRole: boolean; editUser: boolean; viewReports: boolean; }> = {
+    Admin: { createUser: true, deleteUser: true, editRole: true, editUser: true, viewReports: true },
+    Manager: { createUser: true, deleteUser: false, editRole: false, editUser: true, viewReports: true },
+    Receptionist: { createUser: true, deleteUser: false, editRole: false, editUser: false, viewReports: false },
+    Security: { createUser: false, deleteUser: false, editRole: false, editUser: false, viewReports: false },
+    Member: { createUser: false, deleteUser: false, editRole: false, editUser: false, viewReports: false },
 };
 
 // For now, we'll assume the current user is an Admin for demonstration purposes.
-const currentUserRole: Role = 'Admin';
+export const currentUserRole: Role = 'Admin';
 
 
 function RoleSelector({ value, onValueChange, disabled }: { value: Role; onValueChange: (role: Role) => void; disabled?: boolean; }) {
@@ -101,16 +101,20 @@ function AddUserDialog({ onUserAdded }: { onUserAdded: (user: UserRecord) => voi
                 id: userCredential.user.uid,
                 email: userCredential.user.email,
                 fullName: fullName || userCredential.user.email, // Use email as placeholder
-                tier: 'Bronze', // Default tier
+                tier: 'Bronze' as MemberTier, 
                 points: 0,
-                joinDate: new Date().toISOString(),
-                dob: '',
+                joinDate: Timestamp.now(),
+                dob: Timestamp.now(),
                 gender: '',
                 nationality: '',
                 governmentId: '',
                 phone: '',
                 address: '',
-                expiryDate: '',
+                expiryDate: Timestamp.now(),
+                photo: '',
+                idFront: '',
+                idBack: '',
+                status: 'Checked Out' as MemberStatus,
             });
 
 
@@ -413,7 +417,5 @@ export default function AuthRolesPage() {
         </div>
     );
 }
-
-    
 
     
