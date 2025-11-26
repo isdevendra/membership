@@ -61,7 +61,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { cn } from "@/lib/utils";
+import { cn, toDate } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import Link from "next/link";
 
@@ -76,30 +76,6 @@ const tierColors: Record<MemberTier, string> = {
     Staff: "bg-blue-700",
     Blacklist: "bg-red-700",
 };
-
-// Helper to convert Firestore Timestamp or string to Date
-const toDate = (dateValue: any): Date | null => {
-    if (!dateValue) return null;
-    if (dateValue instanceof Timestamp) {
-      return dateValue.toDate();
-    }
-    if (typeof dateValue === 'string' || typeof dateValue === 'number') {
-      const date = new Date(dateValue);
-      if (!isNaN(date.getTime())) {
-        return date;
-      }
-    }
-    // Handle cases where date is already a JS Date object from form state
-    if (dateValue instanceof Date) {
-        return dateValue;
-    }
-    // Handle Firestore's seconds/nanoseconds object representation after serialization
-    if (typeof dateValue === 'object' && 'seconds' in dateValue && 'nanoseconds' in dateValue) {
-        return new Timestamp(dateValue.seconds, dateValue.nanoseconds).toDate();
-    }
-    return null;
-};
-  
 
 function ManageMemberDialog({ member, children }: { member: Member, children: React.ReactNode }) {
     const firestore = useFirestore();
@@ -225,39 +201,49 @@ export function MemberTable() {
 
   const [searchTerm, setSearchTerm] = React.useState("");
   const [tierFilter, setTierFilter] = React.useState<MemberTier | "all">("all");
-  const [fromDate, setFromDate] = React.useState<Date | undefined>(undefined);
-  const [toDateFilter, setToDateFilter] = React.useState<Date | undefined>(undefined);
+  const [dateRange, setDateRange] = React.useState<DateRange | undefined>(undefined);
 
   const isLoading = isUserLoading || isLoadingMembers;
 
   const filteredMembers = React.useMemo(() => {
     if (!members) return [];
     
-    return members.filter((member) => {
-      // Search term filter
-      const matchesSearch =
-        member.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (member.id && member.id.toLowerCase().includes(searchTerm.toLowerCase()));
+    let filtered = members;
 
-      // Tier filter
-      const matchesTier = tierFilter === 'all' || member.tier === tierFilter;
+    if (searchTerm) {
+        filtered = filtered.filter((member) =>
+            member.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            member.id.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }
+    
+    if (tierFilter !== 'all') {
+        filtered = filtered.filter(member => member.tier === tierFilter);
+    }
 
-      // Date range filter
-      const joinDate = toDate(member.joinDate);
-      const matchesDate = joinDate &&
-        (!fromDate || joinDate >= fromDate) &&
-        (!toDateFilter || joinDate <= toDateFilter);
+    if (dateRange?.from) {
+        filtered = filtered.filter(member => {
+            const joinDate = toDate(member.joinDate);
+            return joinDate ? joinDate >= dateRange.from! : false;
+        });
+    }
 
-      return matchesSearch && matchesTier && (!fromDate || !toDateFilter || matchesDate);
-    });
-  }, [members, searchTerm, tierFilter, fromDate, toDateFilter]);
+    if (dateRange?.to) {
+        filtered = filtered.filter(member => {
+            const joinDate = toDate(member.joinDate);
+            return joinDate ? joinDate <= dateRange.to! : false;
+        });
+    }
+
+    return filtered;
+
+  }, [members, searchTerm, tierFilter, dateRange]);
   
-  const isFiltered = tierFilter !== 'all' || fromDate !== undefined || toDateFilter !== undefined;
+  const isFiltered = tierFilter !== 'all' || dateRange !== undefined;
 
   const clearFilters = () => {
     setTierFilter('all');
-    setFromDate(undefined);
-    setToDateFilter(undefined);
+    setDateRange(undefined);
   }
 
   const handleCheckIn = (member: Member) => {
@@ -355,45 +341,32 @@ export function MemberTable() {
                         variant={"outline"}
                         className={cn(
                         "w-full justify-start text-left font-normal sm:w-[240px]",
-                        !fromDate && "text-muted-foreground"
+                        !dateRange && "text-muted-foreground"
                         )}
                     >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {fromDate ? format(fromDate, "LLL dd, y") : <span>From date</span>}
+                        {dateRange?.from ? (
+                            dateRange.to ? (
+                                <>
+                                {format(dateRange.from, "LLL dd, y")} -{" "}
+                                {format(dateRange.to, "LLL dd, y")}
+                                </>
+                            ) : (
+                                format(dateRange.from, "LLL dd, y")
+                            )
+                            ) : (
+                            <span>Filter by join date</span>
+                        )}
                     </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="end">
                     <Calendar
                         initialFocus
-                        mode="single"
-                        selected={fromDate}
-                        onSelect={setFromDate}
-                        numberOfMonths={1}
-                    />
-                    </PopoverContent>
-                </Popover>
-                
-                <Popover>
-                    <PopoverTrigger asChild>
-                    <Button
-                        id="date"
-                        variant={"outline"}
-                        className={cn(
-                        "w-full justify-start text-left font-normal sm:w-[240px]",
-                        !toDateFilter && "text-muted-foreground"
-                        )}
-                    >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {toDateFilter ? format(toDateFilter, "LLL dd, y") : <span>To date</span>}
-                    </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="end">
-                    <Calendar
-                        initialFocus
-                        mode="single"
-                        selected={toDateFilter}
-                        onSelect={setToDateFilter}
-                        numberOfMonths={1}
+                        mode="range"
+                        defaultMonth={dateRange?.from}
+                        selected={dateRange}
+                        onSelect={setDateRange}
+                        numberOfMonths={2}
                     />
                     </PopoverContent>
                 </Popover>
@@ -484,7 +457,7 @@ export function MemberTable() {
                   {member.points.toLocaleString()}
                 </TableCell>
                 <TableCell>{joinDate ? format(joinDate, "MM/dd/yyyy") : 'N/A'}</TableCell>
-                <TableCell>{expiryDate ? format(expiryDate, "MM/dd/yyyy") : 'N/A'}</TableCell>
+                <TableCell>{expiryDate ? format(expiryDate, "MM/dd/yyyy") : 'N-A'}</TableCell>
                 <TableCell>
                   <ManageMemberDialog member={member}>
                     <DropdownMenu>
@@ -536,7 +509,3 @@ export function MemberTable() {
     </Card>
   );
 }
-
-  
-
-    
