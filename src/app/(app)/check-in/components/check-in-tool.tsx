@@ -4,7 +4,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, LogIn, LogOut, History, UserCheck, UserX, ScanLine } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
-import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
+import { Html5Qrcode } from 'html5-qrcode';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const toDate = (dateValue: any): Date | null => {
     if (!dateValue) return null;
@@ -37,6 +38,108 @@ const toDate = (dateValue: any): Date | null => {
     return null;
 };
 
+const QRScanner = ({ open, onScanSuccess, onOpenChange }: { open: boolean, onScanSuccess: (decodedText: string) => void, onOpenChange: (open: boolean) => void }) => {
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannerRegionId = "qr-code-scanner-region";
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      // Cleanup when dialog is closed
+      if (scannerRef.current && scannerRef.current.isScanning) {
+        scannerRef.current.stop().catch(err => {
+          console.warn("QR Scanner stop error on close:", err);
+        });
+      }
+      return;
+    }
+
+    const requestPermissionAndStart = async () => {
+      try {
+        await navigator.mediaDevices.getUserMedia({ video: true });
+        setHasPermission(true);
+      } catch (error) {
+        console.error("Camera permission denied:", error);
+        setHasPermission(false);
+        toast({
+            variant: "destructive",
+            title: "Camera Access Denied",
+            description: "Please enable camera permissions in your browser to use the scanner.",
+        });
+        return;
+      }
+    };
+
+    requestPermissionAndStart();
+  }, [open]);
+
+  useEffect(() => {
+    if(hasPermission === null || !hasPermission || !open) return;
+    
+    // Initialize scanner only once
+    if (!scannerRef.current) {
+        scannerRef.current = new Html5Qrcode(scannerRegionId, false);
+    }
+    const scanner = scannerRef.current;
+
+    // Start scanning
+    scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        (decodedText, decodedResult) => {
+            onScanSuccess(decodedText);
+            onOpenChange(false);
+        },
+        (errorMessage) => {
+            // ignore parse errors
+        }
+    ).catch(err => {
+        console.error("QR Scanner start failed:", err);
+        toast({
+            variant: "destructive",
+            title: "Scanner Failed",
+            description: "Could not start the QR code scanner.",
+        });
+    });
+
+    // Cleanup function
+    return () => {
+      if (scanner.isScanning) {
+        scanner.stop().catch(err => {
+          console.warn("QR Scanner stop error on cleanup:", err);
+        });
+      }
+    };
+
+  }, [open, hasPermission, onScanSuccess, onOpenChange]);
+
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Scan Member QR Code</DialogTitle>
+          <DialogDescription>
+            Position the member's QR code within the frame to automatically check them in.
+          </DialogDescription>
+        </DialogHeader>
+        <div id={scannerRegionId} className="w-full rounded-md overflow-hidden aspect-square"></div>
+        {hasPermission === false && (
+            <Alert variant="destructive">
+                <AlertTitle>Camera Access Denied</AlertTitle>
+                <AlertDescription>
+                    You need to grant camera permissions in your browser settings to use the QR scanner.
+                </AlertDescription>
+            </Alert>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export function CheckInTool() {
   const firestore = useFirestore();
   const [searchTerm, setSearchTerm] = useState('');
@@ -44,10 +147,7 @@ export function CheckInTool() {
   const [searchedMember, setSearchedMember] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-  const scannerRegionId = "qr-code-scanner";
-
-
+  
   const memberSearchQuery = useMemoFirebase(() => {
     if (!firestore || !searchTerm || !searchedMember) return null;
     return query(collection(firestore, 'memberships'), where('fullName', '==', searchTerm), limit(1));
@@ -77,65 +177,8 @@ export function CheckInTool() {
     }
   };
 
-  useEffect(() => {
-    if (isScannerOpen) {
-      if (!scannerRef.current) {
-        scannerRef.current = new Html5Qrcode(scannerRegionId, /* verbose= */ false);
-      }
-      const qrCodeScanner = scannerRef.current;
-
-      const startScanner = async () => {
-        try {
-          if (qrCodeScanner.isScanning) {
-            await qrCodeScanner.stop();
-          }
-          await qrCodeScanner.start(
-            { facingMode: 'environment' },
-            { fps: 10, qrbox: { width: 250, height: 250 } },
-            (decodedText, decodedResult) => {
-              // success callback
-              handleQrCodeSuccess(decodedText);
-              setIsScannerOpen(false); // Close dialog on successful scan
-            },
-            (errorMessage) => {
-              // parse error callback, ignore.
-            }
-          );
-        } catch (err) {
-          console.error("QR Scanner Start Error:", err);
-          toast({
-            variant: 'destructive',
-            title: 'Scanner Error',
-            description: 'Could not start the camera. Please check permissions.',
-          });
-        }
-      };
-
-      const timer = setTimeout(startScanner, 100);
-
-      return () => {
-        clearTimeout(timer);
-      };
-    } else {
-      const stopScanner = async () => {
-        if (scannerRef.current && scannerRef.current.isScanning) {
-          try {
-            await scannerRef.current.stop();
-          } catch (err) {
-            // This can sometimes throw an error if the scanner is already stopped.
-            // We can safely ignore it in the context of closing the dialog.
-            console.warn("Error stopping scanner (can be ignored):", err);
-          }
-        }
-      };
-      stopScanner();
-    }
-  }, [isScannerOpen]);
-
-
   const handleQrCodeSuccess = (decodedText: string) => {
     try {
-      // Assuming QR code contains the URL to the member's profile
       const url = new URL(decodedText);
       const pathParts = url.pathname.split('/');
       const memberId = pathParts[pathParts.length - 1];
@@ -244,25 +287,14 @@ export function CheckInTool() {
               <Button onClick={handleSearch} disabled={isLoading}>
                 {isLoading ? '...' : <Search className="h-4 w-4" />}
               </Button>
-              <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="icon">
-                        <ScanLine className="h-4 w-4" />
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                      <DialogHeader>
-                          <DialogTitle>Scan Member QR Code</DialogTitle>
-                           <DialogDescription>
-                            Position the member's QR code within the frame to automatically check them in.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div id={scannerRegionId} className="w-full rounded-md overflow-hidden aspect-square"></div>
-                      <DialogFooter>
-                          <Button variant="outline" onClick={() => setIsScannerOpen(false)}>Cancel</Button>
-                      </DialogFooter>
-                  </DialogContent>
-              </Dialog>
+                <Button variant="outline" size="icon" onClick={() => setIsScannerOpen(true)}>
+                    <ScanLine className="h-4 w-4" />
+                </Button>
+                <QRScanner 
+                  open={isScannerOpen}
+                  onOpenChange={setIsScannerOpen}
+                  onScanSuccess={handleQrCodeSuccess}
+                />
             </div>
             {selectedMember && (
               <Card className="mt-4">
@@ -354,5 +386,3 @@ export function CheckInTool() {
     </div>
   );
 }
-
-    
