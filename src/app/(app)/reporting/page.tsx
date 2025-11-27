@@ -2,7 +2,7 @@
 'use client';
 import { PageHeader } from "@/components/page-header";
 import { ReportingTool } from "./components/reporting-tool";
-import { permissions, currentUserRole } from "../auth-roles/page";
+import { permissions, currentUserRole } from "@/lib/roles";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { toast } from "@/hooks/use-toast";
@@ -33,5 +33,3 @@ export default function ReportingPage() {
     </div>
   );
 }
-
-    

@@ -33,6 +33,7 @@ import { toast } from '@/hooks/use-toast';
 import { collection, doc, setDoc, Timestamp } from 'firebase/firestore';
 import { type Member, type MemberStatus, type MemberTier } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { type Role, permissions, currentUserRole } from '@/lib/roles';
 
 type UserRecord = {
     id: string;
@@ -40,19 +41,6 @@ type UserRecord = {
     fullName: string;
     role: Role;
 };
-
-type Role = 'Admin' | 'Receptionist' | 'Manager' | 'Security' | 'Member';
-
-export const permissions: Record<Role, { createUser: boolean; deleteUser: boolean; editRole: boolean; editUser: boolean; viewReports: boolean; }> = {
-    Admin: { createUser: true, deleteUser: true, editRole: true, editUser: true, viewReports: true },
-    Manager: { createUser: true, deleteUser: false, editRole: false, editUser: true, viewReports: true },
-    Receptionist: { createUser: true, deleteUser: false, editRole: false, editUser: false, viewReports: false },
-    Security: { createUser: false, deleteUser: false, editRole: false, editUser: false, viewReports: false },
-    Member: { createUser: false, deleteUser: false, editRole: false, editUser: false, viewReports: false },
-};
-
-// For now, we'll assume the current user is an Admin for demonstration purposes.
-export const currentUserRole: Role = 'Admin';
 
 
 function RoleSelector({ value, onValueChange, disabled }: { value: Role; onValueChange: (role: Role) => void; disabled?: boolean; }) {
@@ -299,7 +287,7 @@ export default function AuthRolesPage() {
         // For now, we just show a toast.
         toast({
             title: "Changes Saved (Simulated)",
-            description: `Role for ${userEmail} is now ${newRole}. A backend function would be needed to make this permanent.`,
+            description: `Role for ${userEmail} is now ${newRole}. A backend function is needed to make this permanent.`,
         });
     };
 
@@ -417,5 +405,3 @@ export default function AuthRolesPage() {
         </div>
     );
 }
-
-    
