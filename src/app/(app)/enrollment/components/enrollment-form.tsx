@@ -291,8 +291,11 @@ export function EnrollmentForm() {
                                 )}
                             </div>
                             <FormControl>
-                            <Input placeholder="e.g., CASINO-12345" {...field} />
+                            <Input placeholder="Enter a unique membership ID" {...field} />
                             </FormControl>
+                            <FormDescription>
+                                This ID must be unique for each member.
+                            </FormDescription>
                             <FormMessage />
                         </FormItem>
                         )}
@@ -631,5 +634,7 @@ export function EnrollmentForm() {
     </>
   );
 }
+
+    
 
     
