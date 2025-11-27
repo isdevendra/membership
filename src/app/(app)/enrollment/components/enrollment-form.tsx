@@ -34,8 +34,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useAuth, useFirestore, setDocumentNonBlocking, useCollection, useMemoFirebase } from "@/firebase";
-import { collection, doc, Timestamp, query, orderBy, limit } from "firebase/firestore";
+import { useFirestore, setDocumentNonBlocking } from "@/firebase";
+import { doc, Timestamp } from "firebase/firestore";
 import {
   Dialog,
   DialogContent,
@@ -46,7 +46,6 @@ import {
 } from "@/components/ui/dialog";
 import Link from "next/link";
 import Image from "next/image";
-import { createUserWithEmailAndPassword } from "firebase/auth";
 
 
 const formSchema = z.object({
@@ -57,8 +56,6 @@ const formSchema = z.object({
   email: z.string().email({
     message: "Please enter a valid email address.",
   }),
-  password: z.string().min(6, "Password must be at least 6 characters."),
-  confirmPassword: z.string(),
   phone: z.string().min(1, "Phone number is required."),
   address: z.string().min(1, "Address is required."),
   dob: z.date({
@@ -74,9 +71,6 @@ const formSchema = z.object({
   photo: z.string().optional(),
   idFront: z.string().optional(),
   idBack: z.string().optional(),
-}).refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ["confirmPassword"],
 });
 
 export function EnrollmentForm() {
@@ -88,32 +82,15 @@ export function EnrollmentForm() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const firestore = useFirestore();
-  const auth = useAuth();
   const [enrollmentSuccess, setEnrollmentSuccess] = useState(false);
   const [newMember, setNewMember] = useState<{id: string, name: string} | null>(null);
 
-  const lastMemberQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(collection(firestore, 'memberships'), orderBy('joinDate', 'desc'), limit(1));
-  }, [firestore]);
-
-  const { data: lastMembers, isLoading: isLoadingLastMember } = useCollection<Member>(lastMemberQuery);
-
-  const lastMemberId = useMemo(() => {
-    if (lastMembers && lastMembers.length > 0) {
-      return lastMembers[0].id;
-    }
-    return null;
-  }, [lastMembers]);
-  
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       memberId: "",
       fullName: "",
       email: "",
-      password: "",
-      confirmPassword: "",
       phone: "",
       address: "",
       gender: "",
@@ -158,23 +135,16 @@ export function EnrollmentForm() {
   }, [showCamera]);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!firestore || !auth) {
-        toast({ title: "Error", description: "Firestore or Auth not available."});
+    if (!firestore) {
+        toast({ title: "Error", description: "Firestore not available."});
         return;
     }
     
-    // In a real app with stricter security, you would use a Cloud Function
-    // to create the user and the member document in a single, atomic, and secure transaction.
-    // Creating users client-side should be protected by App Check and strict security rules.
     try {
-        const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
-        const user = userCredential.user;
-        
-        // Now that the auth user is created, create the corresponding Firestore document.
-        const { memberId, password, confirmPassword, ...restOfValues } = values;
+        const { memberId, ...restOfValues } = values;
         const finalValues = { 
             ...restOfValues,
-            id: user.uid, // Use the auth UID as the canonical ID
+            id: memberId, // Use the custom memberId as the canonical ID
             photo, 
             idFront, 
             idBack, 
@@ -186,15 +156,15 @@ export function EnrollmentForm() {
             status: 'Checked Out',
         };
         
-        const memberDocRef = doc(firestore, 'memberships', user.uid);
+        const memberDocRef = doc(firestore, 'memberships', memberId);
         // This is a non-blocking write.
         setDocumentNonBlocking(memberDocRef, finalValues, {});
         
-        setNewMember({ id: user.uid, name: values.fullName });
+        setNewMember({ id: memberId, name: values.fullName });
         setEnrollmentSuccess(true);
         toast({
             title: "Enrollment Successful",
-            description: `${values.fullName} has been enrolled and their user account has been created.`,
+            description: `${values.fullName} has been enrolled.`,
         });
         form.reset();
         setPhoto(null);
@@ -204,7 +174,7 @@ export function EnrollmentForm() {
         toast({
             variant: "destructive",
             title: "Enrollment Failed",
-            description: error.message || "An error occurred during user creation."
+            description: error.message || "An error occurred during member creation."
         });
     }
   }
@@ -246,7 +216,7 @@ export function EnrollmentForm() {
       <Card>
         <CardHeader>
           <CardTitle className="font-headline">New Member Enrollment</CardTitle>
-          <CardDescription>Fill out the form below to add a new member and create their login credentials.</CardDescription>
+          <CardDescription>Fill out the form below to add a new member.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -303,6 +273,20 @@ export function EnrollmentForm() {
 
                 <div className="space-y-4 md:col-span-2">
                    <FormField
+                        control={form.control}
+                        name="memberId"
+                        render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Membership ID</FormLabel>
+                            <FormControl>
+                            <Input placeholder="Enter custom member ID" {...field} />
+                            </FormControl>
+                            <FormDescription>This ID must be unique.</FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                        )}
+                    />
+                   <FormField
                     control={form.control}
                     name="fullName"
                     render={({ field }) => (
@@ -324,39 +308,10 @@ export function EnrollmentForm() {
                           <FormControl>
                               <Input placeholder="member@example.com" {...field} />
                           </FormControl>
-                          <FormDescription>This will be their username for logging in.</FormDescription>
                           <FormMessage />
                           </FormItem>
                       )}
                   />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                        control={form.control}
-                        name="password"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Password</FormLabel>
-                                <FormControl>
-                                    <Input type="password" placeholder="••••••••" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                    <FormField
-                        control={form.control}
-                        name="confirmPassword"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Confirm Password</FormLabel>
-                                <FormControl>
-                                    <Input type="password" placeholder="••••••••" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField
                       control={form.control}
