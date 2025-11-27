@@ -34,7 +34,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useFirestore, setDocumentNonBlocking, useCollection, useMemoFirebase } from "@/firebase";
+import { useAuth, useFirestore, setDocumentNonBlocking, useCollection, useMemoFirebase } from "@/firebase";
 import { collection, doc, Timestamp, query, orderBy, limit } from "firebase/firestore";
 import {
   Dialog,
@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/dialog";
 import Link from "next/link";
 import Image from "next/image";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 
 
 const formSchema = z.object({
@@ -56,6 +57,8 @@ const formSchema = z.object({
   email: z.string().email({
     message: "Please enter a valid email address.",
   }),
+  password: z.string().min(6, "Password must be at least 6 characters."),
+  confirmPassword: z.string(),
   phone: z.string().min(1, "Phone number is required."),
   address: z.string().min(1, "Address is required."),
   dob: z.date({
@@ -71,6 +74,9 @@ const formSchema = z.object({
   photo: z.string().optional(),
   idFront: z.string().optional(),
   idBack: z.string().optional(),
+}).refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
 });
 
 export function EnrollmentForm() {
@@ -82,6 +88,7 @@ export function EnrollmentForm() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const firestore = useFirestore();
+  const auth = useAuth();
   const [enrollmentSuccess, setEnrollmentSuccess] = useState(false);
   const [newMember, setNewMember] = useState<{id: string, name: string} | null>(null);
 
@@ -105,6 +112,8 @@ export function EnrollmentForm() {
       memberId: "",
       fullName: "",
       email: "",
+      password: "",
+      confirmPassword: "",
       phone: "",
       address: "",
       gender: "",
@@ -148,40 +157,56 @@ export function EnrollmentForm() {
     }
   }, [showCamera]);
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    if (!firestore) {
-        toast({ title: "Error", description: "Firestore not available."});
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    if (!firestore || !auth) {
+        toast({ title: "Error", description: "Firestore or Auth not available."});
         return;
     }
-
-    const newId = values.memberId;
-    const { memberId, ...restOfValues } = values;
-    const finalValues = { 
-        ...restOfValues,
-        id: newId, 
-        photo, 
-        idFront, 
-        idBack, 
-        joinDate: Timestamp.fromDate(new Date()),
-        expiryDate: Timestamp.fromDate(values.expiryDate),
-        dob: Timestamp.fromDate(values.dob),
-        tier: values.memberType, 
-        points: 0 
-    };
     
-    const memberDocRef = doc(firestore, 'memberships', newId);
-    setDocumentNonBlocking(memberDocRef, finalValues, {});
-    
-    setNewMember({ id: newId, name: values.fullName });
-    setEnrollmentSuccess(true);
-    toast({
-        title: "Enrollment Successful",
-        description: `${values.fullName} has been enrolled as a new member.`,
-    });
-    form.reset();
-    setPhoto(null);
-    setIdFront(null);
-    setIdBack(null);
+    // In a real app with stricter security, you would use a Cloud Function
+    // to create the user and the member document in a single, atomic, and secure transaction.
+    // Creating users client-side should be protected by App Check and strict security rules.
+    try {
+        const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+        const user = userCredential.user;
+        
+        // Now that the auth user is created, create the corresponding Firestore document.
+        const { memberId, password, confirmPassword, ...restOfValues } = values;
+        const finalValues = { 
+            ...restOfValues,
+            id: user.uid, // Use the auth UID as the canonical ID
+            photo, 
+            idFront, 
+            idBack, 
+            joinDate: Timestamp.fromDate(new Date()),
+            expiryDate: Timestamp.fromDate(values.expiryDate),
+            dob: Timestamp.fromDate(values.dob),
+            tier: values.memberType, 
+            points: 0,
+            status: 'Checked Out',
+        };
+        
+        const memberDocRef = doc(firestore, 'memberships', user.uid);
+        // This is a non-blocking write.
+        setDocumentNonBlocking(memberDocRef, finalValues, {});
+        
+        setNewMember({ id: user.uid, name: values.fullName });
+        setEnrollmentSuccess(true);
+        toast({
+            title: "Enrollment Successful",
+            description: `${values.fullName} has been enrolled and their user account has been created.`,
+        });
+        form.reset();
+        setPhoto(null);
+        setIdFront(null);
+        setIdBack(null);
+    } catch(error: any) {
+        toast({
+            variant: "destructive",
+            title: "Enrollment Failed",
+            description: error.message || "An error occurred during user creation."
+        });
+    }
   }
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, setter: (value: string | null) => void, fieldName: "photo" | "idFront" | "idBack") => {
@@ -221,7 +246,7 @@ export function EnrollmentForm() {
       <Card>
         <CardHeader>
           <CardTitle className="font-headline">New Member Enrollment</CardTitle>
-          <CardDescription>Fill out the form below to add a new member to the system.</CardDescription>
+          <CardDescription>Fill out the form below to add a new member and create their login credentials.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -277,30 +302,7 @@ export function EnrollmentForm() {
                 </div>
 
                 <div className="space-y-4 md:col-span-2">
-                    <FormField
-                        control={form.control}
-                        name="memberId"
-                        render={({ field }) => (
-                        <FormItem>
-                            <div className="flex items-center justify-between">
-                                <FormLabel>Membership ID</FormLabel>
-                                {lastMemberId && (
-                                    <span className="text-xs text-muted-foreground">
-                                        Last ID: {lastMemberId}
-                                    </span>
-                                )}
-                            </div>
-                            <FormControl>
-                            <Input placeholder="Enter a unique membership ID" {...field} />
-                            </FormControl>
-                            <FormDescription>
-                                This ID must be unique for each member.
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                        )}
-                    />
-                  <FormField
+                   <FormField
                     control={form.control}
                     name="fullName"
                     render={({ field }) => (
@@ -313,6 +315,48 @@ export function EnrollmentForm() {
                       </FormItem>
                     )}
                   />
+                   <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                          <FormItem>
+                          <FormLabel>Email Address</FormLabel>
+                          <FormControl>
+                              <Input placeholder="member@example.com" {...field} />
+                          </FormControl>
+                          <FormDescription>This will be their username for logging in.</FormDescription>
+                          <FormMessage />
+                          </FormItem>
+                      )}
+                  />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                        control={form.control}
+                        name="password"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Password</FormLabel>
+                                <FormControl>
+                                    <Input type="password" placeholder="••••••••" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="confirmPassword"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Confirm Password</FormLabel>
+                                <FormControl>
+                                    <Input type="password" placeholder="••••••••" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField
                       control={form.control}
@@ -475,19 +519,7 @@ export function EnrollmentForm() {
                </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                          <FormItem>
-                          <FormLabel>Email Address</FormLabel>
-                          <FormControl>
-                              <Input placeholder="member@example.com" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                          </FormItem>
-                      )}
-                  />
+                 
                   <FormField
                       control={form.control}
                       name="phone"
@@ -501,21 +533,20 @@ export function EnrollmentForm() {
                           </FormItem>
                       )}
                   />
+                  <FormField
+                    control={form.control}
+                    name="address"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Address</FormLabel>
+                        <FormControl>
+                            <Textarea placeholder="123 Casino Ave, Las Vegas, NV 89109" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
               </div>
-
-              <FormField
-                  control={form.control}
-                  name="address"
-                  render={({ field }) => (
-                      <FormItem>
-                      <FormLabel>Address</FormLabel>
-                      <FormControl>
-                          <Textarea placeholder="123 Casino Ave, Las Vegas, NV 89109" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                      </FormItem>
-                  )}
-              />
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <FormItem>
@@ -594,7 +625,7 @@ export function EnrollmentForm() {
                   />
               </div>
               
-              <p className="text-sm text-muted-foreground pt-4">A unique Membership ID with a barcode/QR code will be generated upon successful enrollment.</p>
+              <p className="text-sm text-muted-foreground pt-4">The member's ID card and QR code will be generated upon successful enrollment.</p>
 
               <Button type="submit">
                 <UserPlus className="mr-2 h-4 w-4" />
@@ -634,7 +665,5 @@ export function EnrollmentForm() {
     </>
   );
 }
-
-    
 
     
