@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useMemo } from "react";
@@ -24,7 +25,6 @@ const tierColors: Record<MemberTier, string> = {
     Platinum: "hsl(var(--chart-1))",
     Regular: "hsl(var(--muted))",
     VIP: "hsl(var(--primary))",
-    Staff: "hsl(220 80% 60%)",
     Blacklist: "hsl(var(--destructive))",
 };
 

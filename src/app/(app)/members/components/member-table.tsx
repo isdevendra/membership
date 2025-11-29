@@ -73,7 +73,6 @@ const tierColors: Record<MemberTier, string> = {
     Platinum: "bg-sky-200 text-black",
     Regular: "bg-gray-500",
     VIP: "bg-purple-700",
-    Staff: "bg-blue-700",
     Blacklist: "bg-red-700",
 };
 
@@ -139,7 +138,6 @@ function ManageMemberDialog({ member, children }: { member: Member, children: Re
                     <SelectContent>
                         <SelectItem value="Regular">Regular</SelectItem>
                         <SelectItem value="VIP">VIP</SelectItem>
-                        <SelectItem value="Staff">Staff</SelectItem>
                         <SelectItem value="Blacklist">Blacklist</SelectItem>
                         <SelectItem value="Bronze">Bronze</SelectItem>
                         <SelectItem value="Silver">Silver</SelectItem>
@@ -325,7 +323,6 @@ export function MemberTable() {
                         <SelectItem value="all">All Tiers</SelectItem>
                         <SelectItem value="Regular">Regular</SelectItem>
                         <SelectItem value="VIP">VIP</SelectItem>
-                        <SelectItem value="Staff">Staff</SelectItem>
                         <SelectItem value="Blacklist">Blacklist</SelectItem>
                         <SelectItem value="Bronze">Bronze</SelectItem>
                         <SelectItem value="Silver">Silver</SelectItem>

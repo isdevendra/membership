@@ -18,7 +18,7 @@ const memberImportSchema = z.object({
   id: z.string().optional(),
   fullName: z.string().min(2),
   email: z.string().email(),
-  tier: z.enum(['Bronze', 'Silver', 'Gold', 'Platinum', 'Regular', 'VIP', 'Staff', 'Blacklist']),
+  tier: z.enum(['Bronze', 'Silver', 'Gold', 'Platinum', 'Regular', 'VIP', 'Blacklist']),
   points: z.coerce.number().int().min(0),
   phone: z.string().optional(),
   address: z.string().optional(),

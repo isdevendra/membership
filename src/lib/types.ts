@@ -1,7 +1,7 @@
 
 import { Timestamp } from 'firebase/firestore';
 
-export type MemberTier = 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Regular' | 'VIP' | 'Staff' | 'Blacklist';
+export type MemberTier = 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Regular' | 'VIP' | 'Blacklist';
 
 export type MemberStatus = 'Checked In' | 'Checked Out';
 

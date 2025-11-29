@@ -71,7 +71,7 @@ const formSchema = z.object({
   gender: z.string(),
   nationality: z.string(),
   governmentId: z.string(),
-  tier: z.enum(['Regular', 'VIP', 'Staff', 'Blacklist', 'Bronze', 'Silver', 'Gold', 'Platinum']),
+  tier: z.enum(['Regular', 'VIP', 'Blacklist', 'Bronze', 'Silver', 'Gold', 'Platinum']),
   expiryDate: z.date(),
   photo: z.string().optional(),
   idFront: z.string().optional(),
@@ -436,7 +436,6 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
                         <SelectContent>
                         <SelectItem value="Regular">Regular</SelectItem>
                         <SelectItem value="VIP">VIP</SelectItem>
-                        <SelectItem value="Staff">Staff</SelectItem>
                         <SelectItem value="Blacklist">Blacklist</SelectItem>
                         <SelectItem value="Bronze">Bronze</SelectItem>
                         <SelectItem value="Silver">Silver</SelectItem>
