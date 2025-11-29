@@ -34,7 +34,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useFirestore, setDocumentNonBlocking } from "@/firebase";
+import { useFirestore, setDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, Timestamp } from "firebase/firestore";
 import {
   Dialog,
@@ -73,11 +74,14 @@ const formSchema = z.object({
   idBack: z.string().optional(),
 });
 
+type CameraTarget = 'photo' | 'idFront' | 'idBack';
+
 export function EnrollmentForm() {
   const [photo, setPhoto] = useState<string | null>(null);
   const [idFront, setIdFront] = useState<string | null>(null);
   const [idBack, setIdBack] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
+  const [cameraTarget, setCameraTarget] = useState<CameraTarget>('photo');
   const [hasCameraPermission, setHasCameraPermission] = useState<boolean | undefined>(undefined);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -96,7 +100,7 @@ export function EnrollmentForm() {
       gender: "",
       nationality: "",
       governmentId: "",
-      memberType: 'Regular',
+      memberType: 'Bronze',
       photo: "",
       idFront: "",
       idBack: "",
@@ -191,6 +195,11 @@ export function EnrollmentForm() {
     }
   };
   
+  const handleCameraOpen = (target: CameraTarget) => {
+    setCameraTarget(target);
+    setShowCamera(true);
+  }
+
   const takePicture = () => {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
@@ -201,8 +210,17 @@ export function EnrollmentForm() {
       if (context) {
         context.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
         const dataUrl = canvas.toDataURL('image/png');
-        setPhoto(dataUrl);
-        form.setValue('photo', dataUrl);
+        
+        if (cameraTarget === 'photo') {
+            setPhoto(dataUrl);
+            form.setValue('photo', dataUrl);
+        } else if (cameraTarget === 'idFront') {
+            setIdFront(dataUrl);
+            form.setValue('idFront', dataUrl);
+        } else if (cameraTarget === 'idBack') {
+            setIdBack(dataUrl);
+            form.setValue('idBack', dataUrl);
+        }
         setShowCamera(false);
       }
     }
@@ -235,34 +253,15 @@ export function EnrollmentForm() {
                               <AvatarImage src={photo || undefined} alt="Member photo" />
                               <AvatarFallback className="text-3xl">?</AvatarFallback>
                             </Avatar>
-                              {showCamera ? (
-                                  <div className="w-full space-y-2">
-                                  <video ref={videoRef} className="w-full aspect-video rounded-md bg-muted" autoPlay muted />
-                                  {hasCameraPermission === false && (
-                                      <Alert variant="destructive">
-                                          <AlertTitle>Camera Access Required</AlertTitle>
-                                          <AlertDescription>
-                                              Please allow camera access to use this feature.
-                                          </AlertDescription>
-                                      </Alert>
-                                  )}
-                                  <div className="flex gap-2">
-                                      <Button type="button" onClick={takePicture} className="w-full" disabled={!hasCameraPermission}>Take Picture</Button>
-                                      <Button type="button" variant="outline" onClick={() => setShowCamera(false)}>Close Camera</Button>
-                                  </div>
-                                  <canvas ref={canvasRef} style={{ display: 'none' }} />
-                                  </div>
-                              ) : (
-                                  <div className="flex gap-2 w-full">
-                                      <Button type="button" className="flex-1" onClick={() => document.getElementById('photo-upload')?.click()}>
-                                        <Upload className="mr-2 h-4 w-4" /> Upload
-                                      </Button>
-                                      <Input id="photo-upload" type="file" accept="image/jpeg, image/jpg, image/png" className="hidden" onChange={(e) => handleFileChange(e, setPhoto, 'photo')} />
-                                      <Button type="button" variant="outline" className="flex-1" onClick={() => setShowCamera(true)}>
-                                        <Camera className="mr-2 h-4 w-4" /> Camera
-                                      </Button>
-                                  </div>
-                              )}
+                            <div className="flex gap-2 w-full">
+                                <Button type="button" className="flex-1" onClick={() => document.getElementById('photo-upload')?.click()}>
+                                <Upload className="mr-2 h-4 w-4" /> Upload
+                                </Button>
+                                <Input id="photo-upload" type="file" accept="image/jpeg, image/jpg, image/png" className="hidden" onChange={(e) => handleFileChange(e, setPhoto, 'photo')} />
+                                <Button type="button" variant="outline" className="flex-1" onClick={() => handleCameraOpen('photo')}>
+                                <Camera className="mr-2 h-4 w-4" /> Camera
+                                </Button>
+                            </div>
                           </div>
                         </FormControl>
                         <FormMessage />
@@ -427,7 +426,7 @@ export function EnrollmentForm() {
                                                 <Button type="button" className="flex-1" onClick={() => document.getElementById('id-front-upload')?.click()}>
                                                     <Upload className="mr-2 h-4 w-4" /> Upload
                                                 </Button>
-                                                <Button type="button" variant="outline" className="flex-1" disabled>
+                                                <Button type="button" variant="outline" className="flex-1" onClick={() => handleCameraOpen('idFront')}>
                                                     <Scan className="mr-2 h-4 w-4" /> Scan
                                                 </Button>
                                             </div>
@@ -456,7 +455,7 @@ export function EnrollmentForm() {
                                                <Button type="button" className="flex-1" onClick={() => document.getElementById('id-back-upload')?.click()}>
                                                    <Upload className="mr-2 h-4 w-4" /> Upload
                                                </Button>
-                                               <Button type="button" variant="outline" className="flex-1" disabled>
+                                               <Button type="button" variant="outline" className="flex-1" onClick={() => handleCameraOpen('idBack')}>
                                                     <Scan className="mr-2 h-4 w-4" /> Scan
                                                 </Button>
                                             </div>
@@ -564,13 +563,13 @@ export function EnrollmentForm() {
                               </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                              <SelectItem value="Regular">Regular</SelectItem>
-                              <SelectItem value="VIP">VIP</SelectItem>
-                              <SelectItem value="Blacklist">Blacklist</SelectItem>
                               <SelectItem value="Bronze">Bronze</SelectItem>
                               <SelectItem value="Silver">Silver</SelectItem>
                               <SelectItem value="Gold">Gold</SelectItem>
                               <SelectItem value="Platinum">Platinum</SelectItem>
+                              <SelectItem value="Regular">Regular</SelectItem>
+                              <SelectItem value="VIP">VIP</SelectItem>
+                              <SelectItem value="Blacklist">Blacklist</SelectItem>
                               </SelectContent>
                           </Select>
                           <FormMessage />
@@ -589,6 +588,31 @@ export function EnrollmentForm() {
           </Form>
         </CardContent>
       </Card>
+      
+      <Dialog open={showCamera} onOpenChange={setShowCamera}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Scan Document</DialogTitle>
+            </DialogHeader>
+            <div className="w-full space-y-2">
+                <video ref={videoRef} className="w-full aspect-video rounded-md bg-muted" autoPlay muted playsInline />
+                {hasCameraPermission === false && (
+                    <Alert variant="destructive">
+                        <AlertTitle>Camera Access Required</AlertTitle>
+                        <AlertDescription>
+                            Please allow camera access to use this feature.
+                        </AlertDescription>
+                    </Alert>
+                )}
+                <canvas ref={canvasRef} style={{ display: 'none' }} />
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setShowCamera(false)}>Cancel</Button>
+                <Button onClick={takePicture} disabled={!hasCameraPermission}>Take Picture</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
       <Dialog open={enrollmentSuccess} onOpenChange={setEnrollmentSuccess}>
         <DialogContent>
           <DialogHeader>
