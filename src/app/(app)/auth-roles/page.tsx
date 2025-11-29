@@ -54,7 +54,6 @@ function RoleSelector({ value, onValueChange, disabled }: { value: Role; onValue
         <SelectItem value="Receptionist">Receptionist</SelectItem>
         <SelectItem value="Manager">Manager</SelectItem>
         <SelectItem value="Security">Security</SelectItem>
-        <SelectItem value="Member">Member</SelectItem>
       </SelectContent>
     </Select>
   );
@@ -67,7 +66,7 @@ function AddUserDialog({ onUserAdded }: { onUserAdded: (user: UserRecord) => voi
     const [email, setEmail] = React.useState('');
     const [password, setPassword] = React.useState('');
     const [fullName, setFullName] = React.useState('');
-    const [role, setRole] = React.useState<Role>('Member');
+    const [role, setRole] = React.useState<Role>('Receptionist');
     const [isLoading, setIsLoading] = React.useState(false);
 
     const handleAddUser = async () => {
@@ -113,7 +112,7 @@ function AddUserDialog({ onUserAdded }: { onUserAdded: (user: UserRecord) => voi
             setEmail('');
             setPassword('');
             setFullName('');
-            setRole('Member');
+            setRole('Receptionist');
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Error creating user', description: error.message });
         } finally {
