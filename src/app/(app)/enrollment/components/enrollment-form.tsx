@@ -35,7 +35,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useFirestore, setDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, Timestamp } from "firebase/firestore";
 import {
   Dialog,
@@ -57,7 +56,7 @@ const formSchema = z.object({
   email: z.string().email({
     message: "Please enter a valid email address.",
   }),
-  phone: z.string().min(1, "Phone number is required."),
+  phone: z.string().regex(/^\d+$/, "Phone number must contain only numbers.").min(1, "Phone number is required."),
   address: z.string().min(1, "Address is required."),
   dob: z.date({
     required_error: "A date of birth is required.",
@@ -481,7 +480,7 @@ export function EnrollmentForm() {
                           <FormItem>
                           <FormLabel>Phone Number</FormLabel>
                           <FormControl>
-                              <Input type="tel" placeholder="(123) 456-7890" {...field} />
+                              <Input type="tel" placeholder="1234567890" {...field} />
                           </FormControl>
                           <FormMessage />
                           </FormItem>
