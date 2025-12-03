@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MembershipChart } from './components/membership-chart';
 import { TierDistributionChart } from './components/tier-distribution-chart';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, Timestamp } from 'firebase/firestore';
+import { collection } from 'firebase/firestore';
 import type { Member } from '@/lib/types';
 import { useMemo } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -203,12 +203,12 @@ export default function DashboardPage() {
 
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <MembershipChart />
+        <MembershipChart members={members ?? []} />
         <TierDistributionChart members={members ?? []} />
       </div>
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <TopSpenders />
-        <FrequentVisitors />
+        <TopSpenders members={members ?? []} />
+        <FrequentVisitors members={members ?? []} />
       </div>
     </div>
   );

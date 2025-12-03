@@ -1,33 +1,52 @@
 
 'use client';
 
+import { useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { PlaceHolderImages } from "@/lib/placeholder-images";
+import { type Member, type MemberTier } from '@/lib/types';
+import { Skeleton } from '@/components/ui/skeleton';
 
-const frequentVisitorsData = [
-    { id: '6', name: 'Maximilian Sterling', avatarId: 'avatar-6', visits: 28, tier: 'Platinum' },
-    { id: '1', name: 'Eleanora Vance', avatarId: 'avatar-1', visits: 25, tier: 'Platinum' },
-    { id: '7', name: 'Cassandra Bell', avatarId: 'avatar-7', visits: 22, tier: 'Gold' },
-    { id: '2', name: 'Bartholomew Higgins', avatarId: 'avatar-2', visits: 19, tier: 'Gold' },
-    { id: '8', name: 'Leo Maxwell', avatarId: 'avatar-8', visits: 18, tier: 'Silver' },
-];
 
-const tierColors: { [key: string]: string } = {
-    Platinum: "bg-sky-200 text-black",
-    Gold: "bg-yellow-500",
+const tierColors: Record<MemberTier, string> = {
+    Bronze: "bg-amber-700",
     Silver: "bg-slate-400",
+    Gold: "bg-yellow-500",
+    Platinum: "bg-sky-200 text-black",
+    Regular: "bg-gray-500",
+    VIP: "bg-purple-700",
+    Blacklist: "bg-red-700",
 };
 
 
-export function FrequentVisitors() {
+interface FrequentVisitorsProps {
+    members: Member[];
+}
+
+export function FrequentVisitors({ members }: FrequentVisitorsProps) {
+
+    const frequentVisitorsData = useMemo(() => {
+        // In a real app, visit data would come from a check-in collection.
+        // For now, we'll simulate it with random data based on join date.
+        return [...members]
+            .sort((a, b) => (b.joinDate as any).seconds - (a.joinDate as any).seconds) // Oldest members first
+            .slice(0, 5)
+            .map(member => ({
+                ...member,
+                visits: Math.floor(Math.random() * 25) + 5 // Random visits between 5 and 30
+            }))
+            .sort((a,b) => b.visits - a.visits); // Sort by most visits
+
+    }, [members]);
+
+
     return (
         <Card>
             <CardHeader>
                 <CardTitle className="font-headline">Most Frequent Visitors</CardTitle>
-                <CardDescription>Top members by number of visits this month.</CardDescription>
+                <CardDescription>Top members by number of visits this month. (Simulated)</CardDescription>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -39,17 +58,22 @@ export function FrequentVisitors() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {frequentVisitorsData.map(member => {
-                            const avatar = PlaceHolderImages.find(p => p.id === member.avatarId);
-                            return (
+                        {members.length === 0 && frequentVisitorsData.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={3} className="h-24 text-center">
+                                    No members found.
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            frequentVisitorsData.map(member => (
                                 <TableRow key={member.id}>
                                     <TableCell>
                                         <div className="flex items-center gap-3">
                                             <Avatar>
-                                                <AvatarImage src={avatar?.imageUrl} alt={member.name} />
-                                                <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                                                <AvatarImage src={member.photo} alt={member.fullName} />
+                                                <AvatarFallback>{member.fullName.charAt(0)}</AvatarFallback>
                                             </Avatar>
-                                            <span className="font-medium">{member.name}</span>
+                                            <span className="font-medium">{member.fullName}</span>
                                         </div>
                                     </TableCell>
                                     <TableCell>
@@ -59,8 +83,8 @@ export function FrequentVisitors() {
                                     </TableCell>
                                     <TableCell className="text-right font-mono">{member.visits}</TableCell>
                                 </TableRow>
-                            )
-                        })}
+                            ))
+                        )}
                     </TableBody>
                 </Table>
             </CardContent>
