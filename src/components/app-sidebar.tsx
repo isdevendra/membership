@@ -61,11 +61,6 @@ const menuItems = [
     label: "Rewards",
   },
   {
-    href: "/profiler",
-    icon: BrainCircuit,
-    label: "Patron Profiler",
-  },
-  {
     href: "/reporting",
     icon: FileText,
     label: "Reporting",
@@ -145,6 +140,3 @@ export function AppSidebar() {
 }
 
     
-
-
-
