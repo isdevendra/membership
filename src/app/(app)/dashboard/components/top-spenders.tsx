@@ -29,14 +29,14 @@ export function TopSpenders({ members }: TopSpendersProps) {
     const topSpendersData = useMemo(() => {
         // In a real app, spending data would come from a transaction collection.
         // For now, we'll simulate it by using the 'points' as a proxy for spending,
-        // and sort by that. We'll add some randomness to make it look more realistic.
+        // and sort by that.
         return [...members]
             .sort((a, b) => b.points - a.points)
             .slice(0, 5)
             .map(member => ({
                 ...member,
-                // Simulate spending amount. Let's say 1 point = $0.5 spent.
-                amount: (member.points || 0) * (0.5 + Math.random() * 0.5)
+                // Simulate spending amount. Let's say 1 point = ₹40 spent.
+                amount: (member.points || 0) * (40 + Math.random() * 10)
             }));
 
     }, [members]);
@@ -81,7 +81,7 @@ export function TopSpenders({ members }: TopSpendersProps) {
                                             {member.tier}
                                         </Badge>
                                     </TableCell>
-                                    <TableCell className="text-right font-mono">${member.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                                    <TableCell className="text-right font-mono">₹{member.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                                 </TableRow>
                             ))
                         )}
@@ -91,3 +91,4 @@ export function TopSpenders({ members }: TopSpendersProps) {
         </Card>
     );
 }
+
