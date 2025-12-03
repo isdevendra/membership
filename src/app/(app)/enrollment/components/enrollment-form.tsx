@@ -34,8 +34,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useFirestore, setDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
-import { doc, Timestamp } from "firebase/firestore";
+import { useFirestore, setDocumentNonBlocking, useCollection, useMemoFirebase } from "@/firebase";
+import { doc, Timestamp, query, collection, orderBy, limit } from "firebase/firestore";
 import {
   Dialog,
   DialogContent,
@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/dialog";
 import Link from "next/link";
 import Image from "next/image";
+import { Badge } from "@/components/ui/badge";
 
 
 const formSchema = z.object({
@@ -87,6 +88,20 @@ export function EnrollmentForm() {
   const firestore = useFirestore();
   const [enrollmentSuccess, setEnrollmentSuccess] = useState(false);
   const [newMember, setNewMember] = useState<{id: string, name: string} | null>(null);
+
+  const lastMemberQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'memberships'), orderBy('joinDate', 'desc'), limit(1));
+  }, [firestore]);
+
+  const { data: lastMemberArr } = useCollection<Member>(lastMemberQuery);
+
+  const lastMemberId = useMemo(() => {
+    if (lastMemberArr && lastMemberArr.length > 0) {
+        return lastMemberArr[0].id;
+    }
+    return null;
+  }, [lastMemberArr]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -275,7 +290,12 @@ export function EnrollmentForm() {
                         name="memberId"
                         render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Membership ID</FormLabel>
+                            <div className="flex items-center gap-2">
+                                <FormLabel>Membership ID</FormLabel>
+                                {lastMemberId && (
+                                    <Badge variant="secondary">Last used: {lastMemberId}</Badge>
+                                )}
+                            </div>
                             <FormControl>
                             <Input placeholder="Enter custom member ID" {...field} />
                             </FormControl>
