@@ -50,8 +50,10 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
     }
   };
   
+  // Only render children after settings have been loaded from localStorage on the client.
+  // This prevents hydration mismatches.
   if (!isLoaded) {
-      return null; // Or a loading spinner
+      return null;
   }
 
   return (
