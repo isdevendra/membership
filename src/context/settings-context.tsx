@@ -14,7 +14,7 @@ interface SettingsContextType {
 }
 
 const defaultSettings: Settings = {
-  casinoName: 'Casino Royale',
+  casinoName: 'Membership Manager',
   logoUrl: '',
 };
 
