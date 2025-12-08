@@ -200,7 +200,7 @@ export function MemberTable() {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [tierFilter, setTierFilter] = React.useState<MemberTier | "all">("all");
   const [fromDate, setFromDate] = React.useState<Date | undefined>(undefined);
-  const [toDate, setToDate] = React.useState<Date | undefined>(undefined);
+  const [toDateFilter, setToDateFilter] = React.useState<Date | undefined>(undefined);
 
 
   const isLoading = isUserLoading || isLoadingMembers;
@@ -228,23 +228,23 @@ export function MemberTable() {
         });
     }
 
-    if (toDate) {
+    if (toDateFilter) {
         filtered = filtered.filter(member => {
             const joinDate = toDate(member.joinDate);
-            return joinDate ? joinDate <= toDate : false;
+            return joinDate ? joinDate <= toDateFilter : false;
         });
     }
 
     return filtered;
 
-  }, [members, searchTerm, tierFilter, fromDate, toDate]);
+  }, [members, searchTerm, tierFilter, fromDate, toDateFilter]);
   
-  const isFiltered = tierFilter !== 'all' || fromDate !== undefined || toDate !== undefined;
+  const isFiltered = tierFilter !== 'all' || fromDate !== undefined || toDateFilter !== undefined;
 
   const clearFilters = () => {
     setTierFilter('all');
     setFromDate(undefined);
-    setToDate(undefined);
+    setToDateFilter(undefined);
   }
 
   const handleCheckIn = (member: Member) => {
@@ -355,7 +355,7 @@ export function MemberTable() {
                         selected={fromDate}
                         onSelect={setFromDate}
                         disabled={(date) =>
-                            (toDate && date > toDate) || date > new Date()
+                            (toDateFilter && date > toDateFilter) || date > new Date()
                         }
                     />
                     </PopoverContent>
@@ -368,19 +368,19 @@ export function MemberTable() {
                         variant={"outline"}
                         className={cn(
                         "w-full justify-start text-left font-normal sm:w-[150px]",
-                        !toDate && "text-muted-foreground"
+                        !toDateFilter && "text-muted-foreground"
                         )}
                     >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {toDate ? format(toDate, "LLL dd, y") : <span>To date</span>}
+                        {toDateFilter ? format(toDateFilter, "LLL dd, y") : <span>To date</span>}
                     </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="end">
                     <Calendar
                         initialFocus
                         mode="single"
-                        selected={toDate}
-                        onSelect={setToDate}
+                        selected={toDateFilter}
+                        onSelect={setToDateFilter}
                         disabled={(date) =>
                             (fromDate && date < fromDate) || date > new Date()
                         }
