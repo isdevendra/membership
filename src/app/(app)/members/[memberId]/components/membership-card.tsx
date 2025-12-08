@@ -40,42 +40,63 @@ export function MembershipCard({ member }: MembershipCardProps) {
   const profileUrl = typeof window !== 'undefined' ? `${window.location.origin}/members/${member.id}` : '';
 
   const handlePrint = () => {
-    const printWindow = window.open('', '', 'height=600,width=800');
+    const printWindow = window.open('', '', 'height=800,width=800');
     if (printWindow && cardRef.current) {
         printWindow.document.write('<html><head><title>Print Membership Card</title>');
-        // We need to inject the styles into the new window
-        const styles = Array.from(document.styleSheets)
-            .map(styleSheet => {
-                try {
-                    return Array.from(styleSheet.cssRules)
-                        .map(rule => rule.cssText)
-                        .join('');
-                } catch (e) {
-                    console.warn('Could not read stylesheet for printing:', e);
-                    return '';
-                }
-            })
-            .join('');
-        printWindow.document.write(`<style>${styles}</style>`);
-        printWindow.document.write('<style>@media print { body { -webkit-print-color-adjust: exact; } .no-print { display: none !important; } #printable-card { transform: scale(1) !important; box-shadow: none !important; border: none !important; } }</style>');
-        printWindow.document.write('</head><body style="display: flex; align-items: center; justify-content: center; height: 100%;">');
+
+        // Link all stylesheets from the parent document to the new window
+        Array.from(document.styleSheets).forEach(styleSheet => {
+            if (styleSheet.href) {
+                const link = printWindow.document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = styleSheet.href;
+                printWindow.document.head.appendChild(link);
+            }
+        });
         
-        // Clone the card and give it an ID for styling
+        // Inject inline styles for any dynamic styling not in external sheets
+        const inlineStyles = Array.from(document.querySelectorAll('style'))
+            .map(style => style.innerHTML)
+            .join('');
+        const styleElement = printWindow.document.createElement('style');
+        styleElement.innerHTML = inlineStyles;
+        
+        // Add specific print styles
+        styleElement.innerHTML += `
+            @media print {
+                body {
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                }
+                .no-print {
+                    display: none !important;
+                }
+                #printable-card {
+                    transform: scale(1) !important;
+                    box-shadow: none !important;
+                    border: none !important;
+                }
+            }
+        `;
+        printWindow.document.head.appendChild(styleElement);
+        
+        printWindow.document.write('</head><body style="display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f0f0f0;">');
+
         const printableCard = cardRef.current.cloneNode(true) as HTMLDivElement;
         printableCard.id = "printable-card";
-        printableCard.style.width = "3.375in"; // Standard card width
-        printableCard.style.height = "2.125in"; // Standard card height
-        printableCard.style.transform = "scale(2)"; // Make it larger for better viewing before printing
+        // Use inline styles for dimensions to ensure they are applied
+        printableCard.style.width = "3.375in";
+        printableCard.style.height = "2.125in";
+        printableCard.style.transform = "scale(1.5)"; // Make it larger for viewing before print
+        printableCard.style.transformOrigin = "center";
         
-        printWindow.document.write(printableCard.outerHTML);
-        printWindow.document.write('</body></html>');
-        printWindow.document.close();
-
-        // Delay printing to allow images and styles to load
+        printWindow.document.body.innerHTML = printableCard.outerHTML;
+        
+        // Use a timeout to ensure all styles and images are loaded before printing
         setTimeout(() => {
             printWindow.print();
             printWindow.close();
-        }, 500);
+        }, 1000);
     }
   };
 
