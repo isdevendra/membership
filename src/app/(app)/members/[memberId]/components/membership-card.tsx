@@ -61,34 +61,40 @@ export function MembershipCard({ member }: MembershipCardProps) {
         const styleElement = printWindow.document.createElement('style');
         styleElement.innerHTML = inlineStyles;
         
-        // Add specific print styles
+        // Add specific print styles to enforce size
         styleElement.innerHTML += `
             @media print {
+                @page {
+                    size: auto;
+                    margin: 0;
+                }
                 body {
                     -webkit-print-color-adjust: exact !important;
                     print-color-adjust: exact !important;
+                    margin: 0;
+                    padding: 0;
                 }
                 .no-print {
                     display: none !important;
                 }
                 #printable-card {
+                    width: 3.375in !important;
+                    height: 2.125in !important;
+                    margin: 0;
+                    padding: 0;
                     transform: scale(1) !important;
                     box-shadow: none !important;
                     border: none !important;
+                    page-break-inside: avoid;
                 }
             }
         `;
         printWindow.document.head.appendChild(styleElement);
         
-        printWindow.document.write('</head><body style="display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f0f0f0;">');
+        printWindow.document.write('</head><body>');
 
         const printableCard = cardRef.current.cloneNode(true) as HTMLDivElement;
         printableCard.id = "printable-card";
-        // Use inline styles for dimensions to ensure they are applied
-        printableCard.style.width = "3.375in";
-        printableCard.style.height = "2.125in";
-        printableCard.style.transform = "scale(1.5)"; // Make it larger for viewing before print
-        printableCard.style.transformOrigin = "center";
         
         printWindow.document.body.innerHTML = printableCard.outerHTML;
         
