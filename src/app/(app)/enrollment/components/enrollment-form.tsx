@@ -271,7 +271,7 @@ export function EnrollmentForm() {
                                 <Button type="button" className="flex-1" onClick={() => document.getElementById('photo-upload')?.click()}>
                                 <Upload className="mr-2 h-4 w-4" /> Upload
                                 </Button>
-                                <Input id="photo-upload" type="file" accept="image/jpeg, image/jpg, image/png" className="hidden" onChange={(e) => handleFileChange(e, setPhoto, 'photo')} />
+                                <Input id="photo-upload" type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, setPhoto, 'photo')} />
                                 <Button type="button" variant="outline" className="flex-1" onClick={() => handleCameraOpen('photo')}>
                                 <Camera className="mr-2 h-4 w-4" /> Camera
                                 </Button>
@@ -452,7 +452,7 @@ export function EnrollmentForm() {
                                              <Button type="button" variant="secondary" className="w-full" disabled={!idFront}>
                                                 <Crop className="mr-2 h-4 w-4" /> Crop Image
                                             </Button>
-                                           <Input id="id-front-upload" type="file" accept="image/jpeg, image/jpg, image/png" className="hidden" onChange={(e) => handleFileChange(e, setIdFront, 'idFront')} />
+                                           <Input id="id-front-upload" type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, setIdFront, 'idFront')} />
                                        </div>
                                    </FormControl>
                                    <FormMessage />
@@ -481,7 +481,7 @@ export function EnrollmentForm() {
                                              <Button type="button" variant="secondary" className="w-full" disabled={!idBack}>
                                                 <Crop className="mr-2 h-4 w-4" /> Crop Image
                                             </Button>
-                                           <Input id="id-back-upload" type="file" accept="image/jpeg, image/jpg, image/png" className="hidden" onChange={(e) => handleFileChange(e, setIdBack, 'idBack')} />
+                                           <Input id="id-back-upload" type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, setIdBack, 'idBack')} />
                                        </div>
                                    </FormControl>
                                    <FormMessage />

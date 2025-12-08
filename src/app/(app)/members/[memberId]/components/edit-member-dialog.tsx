@@ -290,7 +290,7 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
                         <Button type="button" className="flex-1" onClick={() => document.getElementById('photo-upload-edit')?.click()}>
                         <Upload className="mr-2 h-4 w-4" /> Upload
                         </Button>
-                        <Input id="photo-upload-edit" type="file" accept="image/png, image/jpeg, image/jpg" className="hidden" onChange={(e) => handleFileChange(e, setPhoto, 'photo')} />
+                        <Input id="photo-upload-edit" type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, setPhoto, 'photo')} />
                         <Button type="button" variant="outline" className="flex-1" onClick={() => handleCameraOpen('photo')}>
                         <Camera className="mr-2 h-4 w-4" /> Camera
                         </Button>
@@ -512,7 +512,7 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
                                         <Button type="button" variant="secondary" className="w-full" disabled={!idFront}>
                                             <Crop className="mr-2 h-4 w-4" /> Crop Image
                                         </Button>
-                                        <Input id="id-front-upload-edit" type="file" accept="image/png, image/jpeg, image/jpg" className="hidden" onChange={(e) => handleFileChange(e, setIdFront, 'idFront')} />
+                                        <Input id="id-front-upload-edit" type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, setIdFront, 'idFront')} />
                                     </div>
                                 </FormControl>
                                 <FormMessage />
@@ -541,7 +541,7 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
                                         <Button type="button" variant="secondary" className="w-full" disabled={!idBack}>
                                             <Crop className="mr-2 h-4 w-4" /> Crop Image
                                         </Button>
-                                        <Input id="id-back-upload-edit" type="file" accept="image/png, image/jpeg, image/jpg" className="hidden" onChange={(e) => handleFileChange(e, setIdBack, 'idBack')} />
+                                        <Input id="id-back-upload-edit" type="file" accept="image/*" className="hidden" onChange={(e) => handleFileChange(e, setIdBack, 'idBack')} />
                                     </div>
                                 </FormControl>
                                 <FormMessage />
@@ -588,5 +588,3 @@ export function EditMemberDialog({ member, onUpdate }: EditMemberDialogProps) {
     </>
   );
 }
-
-    
