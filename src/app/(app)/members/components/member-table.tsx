@@ -199,7 +199,9 @@ export function MemberTable() {
 
   const [searchTerm, setSearchTerm] = React.useState("");
   const [tierFilter, setTierFilter] = React.useState<MemberTier | "all">("all");
-  const [dateRange, setDateRange] = React.useState<DateRange | undefined>(undefined);
+  const [fromDate, setFromDate] = React.useState<Date | undefined>(undefined);
+  const [toDate, setToDate] = React.useState<Date | undefined>(undefined);
+
 
   const isLoading = isUserLoading || isLoadingMembers;
 
@@ -219,29 +221,30 @@ export function MemberTable() {
         filtered = filtered.filter(member => member.tier === tierFilter);
     }
 
-    if (dateRange?.from) {
+    if (fromDate) {
         filtered = filtered.filter(member => {
             const joinDate = toDate(member.joinDate);
-            return joinDate ? joinDate >= dateRange.from! : false;
+            return joinDate ? joinDate >= fromDate : false;
         });
     }
 
-    if (dateRange?.to) {
+    if (toDate) {
         filtered = filtered.filter(member => {
             const joinDate = toDate(member.joinDate);
-            return joinDate ? joinDate <= dateRange.to! : false;
+            return joinDate ? joinDate <= toDate : false;
         });
     }
 
     return filtered;
 
-  }, [members, searchTerm, tierFilter, dateRange]);
+  }, [members, searchTerm, tierFilter, fromDate, toDate]);
   
-  const isFiltered = tierFilter !== 'all' || dateRange !== undefined;
+  const isFiltered = tierFilter !== 'all' || fromDate !== undefined || toDate !== undefined;
 
   const clearFilters = () => {
     setTierFilter('all');
-    setDateRange(undefined);
+    setFromDate(undefined);
+    setToDate(undefined);
   }
 
   const handleCheckIn = (member: Member) => {
@@ -334,39 +337,57 @@ export function MemberTable() {
                 <Popover>
                     <PopoverTrigger asChild>
                     <Button
-                        id="date"
+                        id="date-from"
                         variant={"outline"}
                         className={cn(
-                        "w-full justify-start text-left font-normal sm:w-[240px]",
-                        !dateRange && "text-muted-foreground"
+                        "w-full justify-start text-left font-normal sm:w-[150px]",
+                        !fromDate && "text-muted-foreground"
                         )}
                     >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dateRange?.from ? (
-                            dateRange.to ? (
-                                <>
-                                {format(dateRange.from, "LLL dd, y")} -{" "}
-                                {format(dateRange.to, "LLL dd, y")}
-                                </>
-                            ) : (
-                                format(dateRange.from, "LLL dd, y")
-                            )
-                            ) : (
-                            <span>Filter by join date</span>
-                        )}
+                        {fromDate ? format(fromDate, "LLL dd, y") : <span>From date</span>}
                     </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="end">
                     <Calendar
                         initialFocus
-                        mode="range"
-                        defaultMonth={dateRange?.from}
-                        selected={dateRange}
-                        onSelect={setDateRange}
-                        numberOfMonths={2}
+                        mode="single"
+                        selected={fromDate}
+                        onSelect={setFromDate}
+                        disabled={(date) =>
+                            (toDate && date > toDate) || date > new Date()
+                        }
                     />
                     </PopoverContent>
                 </Popover>
+
+                <Popover>
+                    <PopoverTrigger asChild>
+                    <Button
+                        id="date-to"
+                        variant={"outline"}
+                        className={cn(
+                        "w-full justify-start text-left font-normal sm:w-[150px]",
+                        !toDate && "text-muted-foreground"
+                        )}
+                    >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {toDate ? format(toDate, "LLL dd, y") : <span>To date</span>}
+                    </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                        initialFocus
+                        mode="single"
+                        selected={toDate}
+                        onSelect={setToDate}
+                        disabled={(date) =>
+                            (fromDate && date < fromDate) || date > new Date()
+                        }
+                    />
+                    </PopoverContent>
+                </Popover>
+
 
                 {isFiltered && (
                     <Button variant="ghost" onClick={clearFilters}>
