@@ -3,21 +3,34 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    /**
-     * @description Checks if the request is from an authenticated user.
-     */
+
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * Default-allow rule for an internal staff-facing application.
-     * Grants full read and write access to any authenticated user
-     * for all collections and documents.
-     */
-    match /{document=**} {
-      allow read, write: if isSignedIn();
+    function isSuperAdmin() {
+      return request.auth.token.role == 'Super Admin';
+    }
+
+    function isCompanyAdmin(companyId) {
+      return request.auth.token.companyId == companyId && request.auth.token.role == 'Admin';
+    }
+
+    function isCompanyStaff(companyId) {
+      return request.auth.token.companyId == companyId && request.auth.token.role in ['Admin', 'Manager', 'Receptionist', 'Security'];
+    }
+
+    // Super Admins can manage the list of companies
+    match /companies/{companyId} {
+      allow read, create, update: if isSuperAdmin();
+      // Deletion should be handled by a backend function for safety
+      allow delete: if false;
+    }
+
+    // Rules for data within a specific company
+    match /companies/{companyId}/{document=**} {
+      // Company staff can read/write data within their own company's scope
+      allow read, write: if isCompanyStaff(companyId);
     }
   }
 }

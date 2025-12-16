@@ -16,6 +16,7 @@ import {
   LogOut,
   LogIn,
   UploadCloud,
+  Building,
 } from "lucide-react";
 
 import {
@@ -29,9 +30,10 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { Logo } from "@/components/icons";
-import { useAuth } from "@/firebase";
+import { useAuth, useUser } from "@/firebase";
 import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
+import type { Role } from "@/lib/roles";
 
 
 const menuItems = [
@@ -70,6 +72,12 @@ const menuItems = [
     icon: UploadCloud,
     label: "Import / Export",
   },
+   {
+    href: "/companies",
+    icon: Building,
+    label: "Companies",
+    requiredRole: 'Super Admin'
+  },
   {
     href: "/settings",
     icon: Settings,
@@ -86,6 +94,8 @@ export function AppSidebar() {
   const pathname = usePathname();
   const auth = useAuth();
   const router = useRouter();
+  const { claims } = useUser();
+  const userRole = (claims?.role as Role) || 'Security';
 
   const handleSignOut = async () => {
     if (auth) {
@@ -108,20 +118,25 @@ export function AppSidebar() {
      
       <SidebarContent>
         <SidebarMenu>
-          {menuItems.map((item) => (
-            <SidebarMenuItem key={item.href}>
-              <SidebarMenuButton
-                asChild
-                isActive={pathname.startsWith(item.href)}
-                tooltip={{ children: item.label }}
-              >
-                <Link href={item.href}>
-                  <item.icon />
-                  <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+          {menuItems.map((item) => {
+            if (item.requiredRole && item.requiredRole !== userRole) {
+                return null;
+            }
+            return (
+                <SidebarMenuItem key={item.href}>
+                <SidebarMenuButton
+                    asChild
+                    isActive={pathname.startsWith(item.href)}
+                    tooltip={{ children: item.label }}
+                >
+                    <Link href={item.href}>
+                    <item.icon />
+                    <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
+                    </Link>
+                </SidebarMenuButton>
+                </SidebarMenuItem>
+            );
+          })}
         </SidebarMenu>
       </SidebarContent>
        <SidebarFooter>

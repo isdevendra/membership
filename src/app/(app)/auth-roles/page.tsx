@@ -42,6 +42,7 @@ type UserRecord = {
     email: string;
     fullName: string;
     role: Role;
+    companyId?: string;
 };
 
 
@@ -52,6 +53,7 @@ function RoleSelector({ value, onValueChange, disabled }: { value: Role; onValue
         <SelectValue placeholder="Select role" />
       </SelectTrigger>
       <SelectContent>
+        <SelectItem value="Super Admin">Super Admin</SelectItem>
         <SelectItem value="Admin">Admin</SelectItem>
         <SelectItem value="Receptionist">Receptionist</SelectItem>
         <SelectItem value="Manager">Manager</SelectItem>
@@ -70,46 +72,52 @@ function AddUserDialog({ onUserAdded, currentUserRole }: { onUserAdded: () => vo
     const [fullName, setFullName] = React.useState('');
     const [role, setRole] = React.useState<Role>('Receptionist');
     const [isLoading, setIsLoading] = React.useState(false);
+    const [companyId, setCompanyId] = React.useState('');
+    
+    const companiesCollectionRef = useMemoFirebase(() => (firestore ? collection(firestore, 'companies') : null), [firestore]);
+    const { data: companies, isLoading: isLoadingCompanies } = useCollection<{id: string, name: string}>(companiesCollectionRef);
+
 
     const handleAddUser = async () => {
         if (!auth || !firestore) return;
         setIsLoading(true);
         try {
-            // Check if this is the first user
-            const membersRef = collection(firestore, 'memberships');
-            const snapshot = await getCountFromServer(membersRef);
-            const isFirstUser = snapshot.data().count === 0;
-
-            const finalRole = isFirstUser ? 'Admin' : role;
+            // Determine the role. The very first user ever created becomes a Super Admin.
+            const usersSnapshot = await listAllUsers();
+            const isFirstUser = usersSnapshot.users.length === 0;
+            const finalRole = isFirstUser ? 'Super Admin' : role;
+            const finalCompanyId = isFirstUser ? undefined : companyId;
 
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const user = userCredential.user;
 
-            // Set custom claim for the role
-            await setRoleFlow({ userId: user.uid, role: finalRole });
+            // Set custom claim for the role and company
+            await setRoleFlow({ userId: user.uid, role: finalRole, companyId: finalCompanyId });
 
-            // Also create a member document in Firestore
-            const memberDocRef = doc(firestore, 'memberships', user.uid);
-            await setDoc(memberDocRef, {
-                id: user.uid,
-                email: user.email,
-                fullName: fullName || user.email,
-                tier: 'Bronze' as MemberTier, 
-                points: 0,
-                joinDate: Timestamp.now(),
-                dob: Timestamp.now(),
-                gender: '',
-                nationality: '',
-                governmentId: '',
-                phone: '',
-                address: '',
-                expiryDate: Timestamp.now(),
-                photo: '',
-                idFront: '',
-                idBack: '',
-                status: 'Checked Out' as MemberStatus,
-            });
-
+            // Create a member document for them only if they are NOT a super admin
+            if (finalRole !== 'Super Admin' && finalCompanyId) {
+                const memberDocRef = doc(firestore, `companies/${finalCompanyId}/memberships`, user.uid);
+                await setDoc(memberDocRef, {
+                    id: user.uid,
+                    companyId: finalCompanyId,
+                    email: user.email,
+                    fullName: fullName || user.email,
+                    tier: 'Bronze' as MemberTier, 
+                    points: 0,
+                    joinDate: Timestamp.now(),
+                    dob: Timestamp.now(),
+                    gender: '',
+                    nationality: '',
+                    governmentId: '',
+                    phone: '',
+                    address: '',
+                    expiryDate: Timestamp.now(),
+                    photo: '',
+                    idFront: '',
+                    idBack: '',
+                    status: 'Checked Out' as MemberStatus,
+                });
+            }
 
             onUserAdded();
             await user.getIdToken(true); // Force refresh of token to get new role
@@ -120,6 +128,7 @@ function AddUserDialog({ onUserAdded, currentUserRole }: { onUserAdded: () => vo
             setPassword('');
             setFullName('');
             setRole('Receptionist');
+            setCompanyId('');
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Error creating user', description: error.message });
         } finally {
@@ -142,7 +151,7 @@ function AddUserDialog({ onUserAdded, currentUserRole }: { onUserAdded: () => vo
                 <DialogHeader>
                     <DialogTitle>Add New User</DialogTitle>
                     <DialogDescription>
-                        Create a new user and assign them a role. Note: this creates a real Firebase Auth user and a member profile.
+                        Create a new user and assign them a role and company.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
@@ -164,10 +173,25 @@ function AddUserDialog({ onUserAdded, currentUserRole }: { onUserAdded: () => vo
                             <RoleSelector value={role} onValueChange={setRole} />
                         </div>
                     </div>
+                     {role !== 'Super Admin' && (
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="company" className="text-right">Company</Label>
+                            <div className="col-span-3">
+                                 <Select value={companyId} onValueChange={setCompanyId} disabled={isLoadingCompanies}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select a company" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {companies?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                    )}
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
-                    <Button onClick={handleAddUser} disabled={isLoading}>
+                    <Button onClick={handleAddUser} disabled={isLoading || (role !== 'Super Admin' && !companyId)}>
                         {isLoading ? 'Creating...' : 'Create User'}
                     </Button>
                 </DialogFooter>
@@ -189,10 +213,10 @@ function EditUserDialog({ user, children }: { user: UserRecord, children: React.
     }, [isOpen, user.fullName]);
     
     const handleSaveChanges = () => {
-        if (!firestore) return;
+        if (!firestore || !user.companyId) return;
         setIsLoading(true);
 
-        const memberDocRef = doc(firestore, 'memberships', user.id);
+        const memberDocRef = doc(firestore, `companies/${user.companyId}/memberships`, user.id);
         updateDocumentNonBlocking(memberDocRef, { fullName });
         
         toast({
@@ -216,8 +240,9 @@ function EditUserDialog({ user, children }: { user: UserRecord, children: React.
                  <div className="grid gap-4 py-4">
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="fullName" className="text-right">Full Name</Label>
-                        <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} className="col-span-3" />
+                        <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} className="col-span-3" disabled={!user.companyId} />
                     </div>
+                     {!user.companyId && <p className="text-sm text-muted-foreground text-center col-span-4">Super Admins do not have an editable profile here.</p>}
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label className="text-right">Password</Label>
                         <div className='col-span-3'>
@@ -228,7 +253,7 @@ function EditUserDialog({ user, children }: { user: UserRecord, children: React.
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
-                    <Button onClick={handleSaveChanges} disabled={isLoading}>
+                    <Button onClick={handleSaveChanges} disabled={isLoading || !user.companyId}>
                         {isLoading ? 'Saving...' : 'Save Changes'}
                     </Button>
                 </DialogFooter>
@@ -246,54 +271,71 @@ export default function AuthRolesPage() {
     const currentUserRole = (claims?.role as Role) || 'Security';
 
     const fetchUsers = React.useCallback(async () => {
+        // Only Super Admins should be able to list all users
+        if (currentUserRole !== 'Super Admin') {
+            setIsLoading(false);
+            setUsersWithRoles([]);
+            return;
+        }
+
         setIsLoading(true);
         try {
             const { users } = await listAllUsers();
             const userRecords = users.map(u => ({
                 id: u.uid,
                 email: u.email,
-                // The backend flow doesn't return `displayName`, so use `fullName`
-                // and provide a fallback to the email.
                 fullName: u.fullName || u.email, 
-                role: u.role as Role || 'Security' // Fallback for users without a role
+                role: u.role as Role || 'Security',
+                companyId: u.companyId,
             }));
             setUsersWithRoles(userRecords);
-        } catch (error: any) {
+        } catch (error: any) => {
             toast({ variant: 'destructive', title: 'Failed to fetch users', description: error.message });
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [currentUserRole]);
 
     React.useEffect(() => {
-        fetchUsers();
-    }, [fetchUsers]);
+        if (!isUserLoading) {
+            fetchUsers();
+        }
+    }, [fetchUsers, isUserLoading]);
     
-    const handleRoleChange = async (userId: string, newRole: Role) => {
+    const handleRoleChange = async (userId: string, newRole: Role, companyId?: string) => {
         const originalUsers = [...usersWithRoles];
         const userToUpdate = usersWithRoles.find(u => u.id === userId);
         if (!userToUpdate) return;
         
-        // Optimistically update UI
         setUsersWithRoles(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
         
         try {
-            await setRoleFlow({ userId, role: newRole });
+            await setRoleFlow({ userId, role: newRole, companyId });
             toast({ title: 'Role Updated', description: `${userToUpdate.email}'s role set to ${newRole}.` });
-            // Optionally, re-fetch the user to confirm the change from the source of truth
-            await user?.getIdToken(true); // Force refresh current user's token
+            await user?.getIdToken(true);
             
         } catch (error: any) {
             toast({ variant: 'destructive', title: "Failed to set role", description: error.message || 'Please check server logs.' });
-             // Revert optimistic update
             setUsersWithRoles(originalUsers);
         }
     };
     
     const handleRemoveUser = (userId: string, userEmail: string) => {
-        // In a real app, you'd call a backend function to delete the user.
-        toast({ title: 'User Removed (Simulated)', description: `User ${userEmail} removed from the list. A backend function is needed to delete the actual Firebase user and their data.` });
+        toast({ title: 'User Removed (Simulated)', description: `User ${userEmail} removed. Backend function needed to delete user.` });
     };
+
+    if (currentUserRole !== 'Super Admin' && !isUserLoading) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Access Denied</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p>You do not have permission to manage users. This page is for Super Admins only.</p>
+                </CardContent>
+            </Card>
+        )
+    }
 
 
     return (
@@ -304,7 +346,7 @@ export default function AuthRolesPage() {
                 <div className="grid gap-2">
                     <CardTitle>User Role Management</CardTitle>
                     <CardDescription>
-                        Assign roles to users to control their access. Changes are saved automatically.
+                        Assign roles and companies to users. Changes are saved automatically.
                     </CardDescription>
                 </div>
                  <AddUserDialog onUserAdded={fetchUsers} currentUserRole={currentUserRole} />
@@ -315,6 +357,7 @@ export default function AuthRolesPage() {
                 <TableRow>
                     <TableHead>User (Name/Email)</TableHead>
                     <TableHead>Role</TableHead>
+                    <TableHead>Company ID</TableHead>
                     <TableHead>
                     <span className="sr-only">Actions</span>
                     </TableHead>
@@ -326,13 +369,14 @@ export default function AuthRolesPage() {
                             <TableRow key={index}>
                                 <TableCell><Skeleton className="h-4 w-[200px]" /></TableCell>
                                 <TableCell><Skeleton className="h-8 w-[180px]" /></TableCell>
+                                <TableCell><Skeleton className="h-4 w-[250px]" /></TableCell>
                                 <TableCell><Skeleton className="h-8 w-8 rounded-full" /></TableCell>
                             </TableRow>
                         ))
                     ) : usersWithRoles.length === 0 ? (
                         <TableRow>
-                            <TableCell colSpan={3} className="h-24 text-center">
-                                No users found. Use the "Add User" button to create one.
+                            <TableCell colSpan={4} className="h-24 text-center">
+                                No users found. Use the "Add User" button to create the first Super Admin.
                             </TableCell>
                         </TableRow>
                     ) : (
@@ -345,9 +389,12 @@ export default function AuthRolesPage() {
                                 <TableCell>
                                     <RoleSelector
                                         value={userRecord.role}
-                                        onValueChange={(role) => handleRoleChange(userRecord.id, role)}
+                                        onValueChange={(role) => handleRoleChange(userRecord.id, role, userRecord.companyId)}
                                         disabled={!permissions[currentUserRole]?.editRole || userRecord.id === user?.uid}
                                     />
+                                </TableCell>
+                                <TableCell>
+                                    <div className="text-sm text-muted-foreground">{userRecord.companyId || 'N/A'}</div>
                                 </TableCell>
                                 <TableCell>
                                     <DropdownMenu>
