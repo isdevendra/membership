@@ -27,13 +27,15 @@ import {
   } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useAuth, useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking } from '@/firebase';
-import { createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
+import { useAuth, useCollection, useFirestore, useMemoFirebase, updateDocumentNonBlocking, useUser } from '@/firebase';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { toast } from '@/hooks/use-toast';
-import { collection, doc, setDoc, Timestamp } from 'firebase/firestore';
+import { collection, doc, setDoc, Timestamp, getCountFromServer } from 'firebase/firestore';
 import { type Member, type MemberStatus, type MemberTier } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-import { type Role, permissions, currentUserRole } from '@/lib/roles';
+import { type Role, permissions } from '@/lib/roles';
+import { setRole as setRoleFlow } from '@/ai/flows/set-role-flow';
+import { listAllUsers } from '@/ai/flows/list-all-users';
 
 type UserRecord = {
     id: string;
@@ -59,7 +61,7 @@ function RoleSelector({ value, onValueChange, disabled }: { value: Role; onValue
   );
 }
 
-function AddUserDialog({ onUserAdded }: { onUserAdded: (user: UserRecord) => void }) {
+function AddUserDialog({ onUserAdded, currentUserRole }: { onUserAdded: () => void, currentUserRole: Role }) {
     const auth = useAuth();
     const firestore = useFirestore();
     const [isOpen, setIsOpen] = React.useState(false);
@@ -73,21 +75,25 @@ function AddUserDialog({ onUserAdded }: { onUserAdded: (user: UserRecord) => voi
         if (!auth || !firestore) return;
         setIsLoading(true);
         try {
-            // NOTE: In a real app, you'd typically use a Cloud Function to create users
-            // and set their roles (custom claims) atomically and securely.
-            // Creating users directly on the client should only be done with very strict security rules.
+            // Check if this is the first user
+            const membersRef = collection(firestore, 'memberships');
+            const snapshot = await getCountFromServer(membersRef);
+            const isFirstUser = snapshot.data().count === 0;
+
+            const finalRole = isFirstUser ? 'Admin' : role;
+
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            const newUser = { id: userCredential.user.uid, email: userCredential.user.email!, fullName, role };
-            
-            // In a real app, you'd set the custom claim for the role on the backend here.
-            // For now, we are managing roles in the client state.
-            
+            const user = userCredential.user;
+
+            // Set custom claim for the role
+            await setRoleFlow({ userId: user.uid, role: finalRole });
+
             // Also create a member document in Firestore
-            const memberDocRef = doc(firestore, 'memberships', userCredential.user.uid);
+            const memberDocRef = doc(firestore, 'memberships', user.uid);
             await setDoc(memberDocRef, {
-                id: userCredential.user.uid,
-                email: userCredential.user.email,
-                fullName: fullName || userCredential.user.email, // Use email as placeholder
+                id: user.uid,
+                email: user.email,
+                fullName: fullName || user.email,
                 tier: 'Bronze' as MemberTier, 
                 points: 0,
                 joinDate: Timestamp.now(),
@@ -105,9 +111,10 @@ function AddUserDialog({ onUserAdded }: { onUserAdded: (user: UserRecord) => voi
             });
 
 
-            onUserAdded(newUser);
+            onUserAdded();
+            await user.getIdToken(true); // Force refresh of token to get new role
 
-            toast({ title: 'User Created', description: `Successfully created user ${email} and their member profile.` });
+            toast({ title: 'User Created', description: `Successfully created user ${email} with role ${finalRole}.` });
             setIsOpen(false);
             setEmail('');
             setPassword('');
@@ -124,7 +131,7 @@ function AddUserDialog({ onUserAdded }: { onUserAdded: (user: UserRecord) => voi
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-                 <Button size="sm" className="ml-auto gap-1" disabled={!permissions[currentUserRole].createUser}>
+                 <Button size="sm" className="ml-auto gap-1" disabled={!permissions[currentUserRole]?.createUser}>
                     <PlusCircle className="h-3.5 w-3.5" />
                     <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
                         Add User
@@ -232,81 +239,59 @@ function EditUserDialog({ user, children }: { user: UserRecord, children: React.
 
 
 export default function AuthRolesPage() {
-    const auth = useAuth();
-    const firestore = useFirestore();
+    const { user, claims, isUserLoading } = useUser();
+    const [usersWithRoles, setUsersWithRoles] = React.useState<UserRecord[]>([]);
+    const [isLoading, setIsLoading] = React.useState(true);
 
-    const membersCollection = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return collection(firestore, 'memberships');
-    }, [firestore]);
+    const currentUserRole = (claims?.role as Role) || 'Security';
 
-    const { data: members, isLoading } = useCollection<Member>(membersCollection);
-
-    const users: UserRecord[] = React.useMemo(() => {
-        if (!members) return [];
-        return members.map(member => ({
-            id: member.id,
-            email: member.email,
-            fullName: member.fullName,
-            // In a real app, role would come from custom claims or Firestore.
-            // For now, we default everyone to "Member".
-            role: 'Member'
-        }));
-    }, [members]);
-
-    const [userRoles, setUserRoles] = React.useState<Record<string, Role>>({});
+    const fetchUsers = React.useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const { users } = await listAllUsers();
+            const userRecords = users.map(u => ({
+                id: u.uid,
+                email: u.email,
+                // The backend flow doesn't return `displayName`, so use `fullName`
+                // and provide a fallback to the email.
+                fullName: u.fullName || u.email, 
+                role: u.role as Role || 'Security' // Fallback for users without a role
+            }));
+            setUsersWithRoles(userRecords);
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Failed to fetch users', description: error.message });
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
 
     React.useEffect(() => {
-        const initialRoles = users.reduce((acc, user) => {
-            acc[user.id] = user.role;
-            return acc;
-        }, {} as Record<string, Role>);
-        setUserRoles(initialRoles);
-    }, [users]);
+        fetchUsers();
+    }, [fetchUsers]);
     
-
-    const handleRoleChange = (userId: string, role: Role) => {
-        setUserRoles(prev => ({ ...prev, [userId]: role }));
-        const userEmail = users.find(u => u.id === userId)?.email;
-        toast({ title: "Role Changed (Staged)", description: `Role for ${userEmail} set to ${role}. Click 'Save Changes' to apply.`})
-    };
-    
-    // This function can be used to manually add a new user to the local state if needed,
-    // though fetching from the collection is now the primary way users are displayed.
-    const handleUserAdded = (newUser: UserRecord) => {
-        // The useCollection hook will automatically update the list,
-        // so we don't strictly need to manually add to a local state anymore.
-        // This function can be kept for optimistic updates if desired.
-    };
-
-    const handleSaveChanges = (userId: string) => {
-        const newRole = userRoles[userId];
-        const userEmail = users.find(u => u.id === userId)?.email;
-        // In a real app, you would call a backend function to set a custom claim.
-        // For now, we just show a toast.
-        toast({
-            title: "Changes Saved (Simulated)",
-            description: `Role for ${userEmail} is now ${newRole}. A backend function is needed to make this permanent.`,
-        });
-    };
-
-    const handleRemoveUser = (userId: string, userEmail: string) => {
-        if (!auth) {
-            toast({ variant: 'destructive', title: 'Error', description: 'Authentication service not available.' });
-            return;
-        }
-
-        // This action is highly sensitive and in a production app should be handled by a secure backend function
-        // that verifies the current user's admin privileges before deleting another user.
-        // Client-side user deletion is not possible for other users.
-        if (auth.currentUser?.uid === userId) {
-            toast({ variant: 'destructive', title: 'Action Not Allowed', description: 'You cannot remove your own account from this panel.' });
-            return;
-        }
+    const handleRoleChange = async (userId: string, newRole: Role) => {
+        const originalUsers = [...usersWithRoles];
+        const userToUpdate = usersWithRoles.find(u => u.id === userId);
+        if (!userToUpdate) return;
         
+        // Optimistically update UI
+        setUsersWithRoles(prev => prev.map(u => u.id === userId ? { ...u, role: newRole } : u));
+        
+        try {
+            await setRoleFlow({ userId, role: newRole });
+            toast({ title: 'Role Updated', description: `${userToUpdate.email}'s role set to ${newRole}.` });
+            // Optionally, re-fetch the user to confirm the change from the source of truth
+            await user?.getIdToken(true); // Force refresh current user's token
+            
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: "Failed to set role", description: error.message || 'Please check server logs.' });
+             // Revert optimistic update
+            setUsersWithRoles(originalUsers);
+        }
+    };
+    
+    const handleRemoveUser = (userId: string, userEmail: string) => {
         // In a real app, you'd call a backend function to delete the user.
-        // We're simulating this by just showing a toast. The user will still exist in Auth.
-        // To also remove from the view, we would need to delete the firestore doc.
         toast({ title: 'User Removed (Simulated)', description: `User ${userEmail} removed from the list. A backend function is needed to delete the actual Firebase user and their data.` });
     };
 
@@ -319,10 +304,10 @@ export default function AuthRolesPage() {
                 <div className="grid gap-2">
                     <CardTitle>User Role Management</CardTitle>
                     <CardDescription>
-                        Assign roles to users to control their access. User management requires backend functions for full security.
+                        Assign roles to users to control their access. Changes are saved automatically.
                     </CardDescription>
                 </div>
-                 <AddUserDialog onUserAdded={handleUserAdded} />
+                 <AddUserDialog onUserAdded={fetchUsers} currentUserRole={currentUserRole} />
             </CardHeader>
             <CardContent>
             <Table>
@@ -344,49 +329,48 @@ export default function AuthRolesPage() {
                                 <TableCell><Skeleton className="h-8 w-8 rounded-full" /></TableCell>
                             </TableRow>
                         ))
-                    ) : users.length === 0 ? (
+                    ) : usersWithRoles.length === 0 ? (
                         <TableRow>
                             <TableCell colSpan={3} className="h-24 text-center">
                                 No users found. Use the "Add User" button to create one.
                             </TableCell>
                         </TableRow>
                     ) : (
-                        users.map((user) => (
-                            <TableRow key={user.id}>
+                        usersWithRoles.map((userRecord) => (
+                            <TableRow key={userRecord.id}>
                                 <TableCell>
-                                    <div className="font-medium">{user.fullName}</div>
-                                    <div className="text-sm text-muted-foreground">{user.email}</div>
+                                    <div className="font-medium">{userRecord.fullName}</div>
+                                    <div className="text-sm text-muted-foreground">{userRecord.email}</div>
                                 </TableCell>
                                 <TableCell>
                                     <RoleSelector
-                                        value={userRoles[user.id] || user.role}
-                                        onValueChange={(role) => handleRoleChange(user.id, role)}
-                                        disabled={!permissions[currentUserRole].editRole}
+                                        value={userRecord.role}
+                                        onValueChange={(role) => handleRoleChange(userRecord.id, role)}
+                                        disabled={!permissions[currentUserRole]?.editRole || userRecord.id === user?.uid}
                                     />
                                 </TableCell>
                                 <TableCell>
                                     <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <Button aria-haspopup="true" size="icon" variant="ghost">
+                                        <Button aria-haspopup="true" size="icon" variant="ghost" disabled={userRecord.id === user?.uid}>
                                         <MoreHorizontal className="h-4 w-4" />
                                         <span className="sr-only">Toggle menu</span>
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
                                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                        <DropdownMenuItem onClick={() => handleSaveChanges(user.id)}>Save Role Change</DropdownMenuItem>
-                                        <EditUserDialog user={user}>
+                                        <EditUserDialog user={userRecord}>
                                              <DropdownMenuItem
                                                 onSelect={(e) => e.preventDefault()}
-                                                disabled={!permissions[currentUserRole].editUser}
+                                                disabled={!permissions[currentUserRole]?.editUser}
                                              >
                                                 Edit User
                                             </DropdownMenuItem>
                                         </EditUserDialog>
                                         <DropdownMenuSeparator />
                                         <DropdownMenuItem
-                                            onClick={() => handleRemoveUser(user.id, user.email)}
-                                            disabled={!permissions[currentUserRole].deleteUser}
+                                            onClick={() => handleRemoveUser(userRecord.id, userRecord.email)}
+                                            disabled={!permissions[currentUserRole]?.deleteUser}
                                             className="text-red-600 focus:text-red-600 focus:bg-red-50"
                                         >
                                             Remove User

@@ -23,8 +23,8 @@ export default function LoginPage() {
   const auth = useAuth();
   const router = useRouter();
   const { settings } = useSettings();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('admin@example.com');
+  const [password, setPassword] = useState('password');
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSignIn = async (e: FormEvent) => {
@@ -59,7 +59,7 @@ export default function LoginPage() {
         <CardHeader>
           <CardTitle className="text-2xl">Login</CardTitle>
           <CardDescription>
-            Enter your email below to login to your account
+            Enter your email below to login. Default credentials are provided for the initial admin account.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -77,7 +77,7 @@ export default function LoginPage() {
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">Password</Label>              
               <Input 
                 id="password" 
                 type="password" 
