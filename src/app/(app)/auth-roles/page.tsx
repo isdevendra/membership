@@ -289,7 +289,7 @@ export default function AuthRolesPage() {
                 companyId: u.companyId,
             }));
             setUsersWithRoles(userRecords);
-        } catch (error: any) => {
+        } catch (error: any) {
             toast({ variant: 'destructive', title: 'Failed to fetch users', description: error.message });
         } finally {
             setIsLoading(false);
