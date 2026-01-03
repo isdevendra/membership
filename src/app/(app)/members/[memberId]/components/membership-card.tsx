@@ -12,6 +12,17 @@ import { type Member } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useSettings } from '@/context/settings-context';
 import Image from 'next/image';
+import { Share2 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { toast } from '@/hooks/use-toast';
 
 interface MembershipCardProps {
   member: Member;
@@ -33,6 +44,103 @@ const toDate = (dateValue: any): Date | null => {
     }
     return null;
 };
+
+function ShareDialog({ member, profileUrl }: { member: Member, profileUrl: string }) {
+    const qrCodeRef = React.useRef<HTMLDivElement>(null);
+
+    const getQrCodeAsBlob = async (): Promise<Blob | null> => {
+        const svgElement = qrCodeRef.current?.querySelector('svg');
+        if (!svgElement) return null;
+
+        const svgText = new XMLSerializer().serializeToString(svgElement);
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        if (!context) return null;
+
+        const img = document.createElement('img');
+        await new Promise<void>(resolve => {
+            img.onload = () => resolve();
+            img.src = `data:image/svg+xml;base64,${btoa(svgText)}`;
+        });
+        
+        canvas.width = img.width;
+        canvas.height = img.height;
+        context.drawImage(img, 0, 0);
+        
+        return new Promise(resolve => {
+            canvas.toBlob(blob => resolve(blob), 'image/png');
+        });
+    }
+
+    const handleDownload = async () => {
+        const blob = await getQrCodeAsBlob();
+        if (!blob) return;
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${member.fullName.replace(/\s+/g, '_')}_QR.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
+    const handleShare = async () => {
+        const blob = await getQrCodeAsBlob();
+        if (!blob) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Could not generate QR code for sharing.' });
+            return;
+        }
+
+        const file = new File([blob], `${member.fullName.replace(/\s+/g, '_')}_QR.png`, { type: 'image/png' });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+                await navigator.share({
+                    files: [file],
+                    title: 'Membership QR Code',
+                    text: `Here is the membership QR code for ${member.fullName}.`,
+                });
+            } catch (error) {
+                // This can happen if the user cancels the share dialog
+                console.info('Share action was cancelled or failed.', error);
+            }
+        } else {
+            toast({
+                title: "Sharing Not Supported",
+                description: "Your browser doesn't support sharing files directly. Please download the QR code instead.",
+            });
+        }
+    };
+
+    return (
+        <Dialog>
+            <DialogTrigger asChild>
+                <Button variant="secondary" className="w-full">
+                    <Share2 className="mr-2 h-4 w-4" /> Share Card
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Share Membership QR Code</DialogTitle>
+                    <DialogDescription>
+                        Share or download the QR code for {member.fullName}.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="flex justify-center p-4">
+                     <div ref={qrCodeRef} className="bg-white p-4 rounded-lg border">
+                        <QRCode value={profileUrl} size={256} />
+                    </div>
+                </div>
+                <DialogFooter className="sm:justify-center flex-col sm:flex-col sm:space-x-0 gap-2">
+                    <Button onClick={handleDownload}>Download QR</Button>
+                    {navigator.share && <Button onClick={handleShare} variant="outline">Share</Button>}
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 export function MembershipCard({ member }: MembershipCardProps) {
   const cardRef = React.useRef<HTMLDivElement>(null);
@@ -158,8 +266,9 @@ export function MembershipCard({ member }: MembershipCardProps) {
                 </div>
             </div>
         </div>
-        <div className="flex flex-col items-center mt-4 space-y-4 no-print">
+        <div className="flex flex-col items-center mt-4 space-y-2 no-print">
             <Button onClick={handlePrint} className="w-full">Print Card</Button>
+            <ShareDialog member={member} profileUrl={profileUrl} />
         </div>
     </div>
   );
