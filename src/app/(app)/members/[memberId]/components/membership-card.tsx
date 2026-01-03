@@ -176,10 +176,19 @@ export function MembershipCard({ member }: MembershipCardProps) {
         
         styleElement.innerHTML += `
             @media print {
-                @page { size: auto; margin: 0; }
+                @page { size: 3.37in 2.125in; margin: 0; }
                 body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; margin: 0; padding: 0; }
                 .no-print { display: none !important; }
-                #printable-card { width: 3.375in !important; height: 2.125in !important; margin: 0; padding: 0; transform: scale(1) !important; box-shadow: none !important; border: none !important; page-break-inside: avoid; }
+                #printable-card { 
+                    width: 3.37in !important; 
+                    height: 2.125in !important; 
+                    margin: 0; 
+                    padding: 0; 
+                    transform: scale(1) !important; 
+                    box-shadow: none !important; 
+                    border: none !important; 
+                    page-break-inside: avoid;
+                }
             }
         `;
         printWindow.document.head.appendChild(styleElement);
