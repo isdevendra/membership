@@ -50,7 +50,7 @@ import { Badge } from "@/components/ui/badge";
 
 
 const formSchema = z.object({
-  memberId: z.string().min(1, "Membership ID is required."),
+  memberId: z.string().regex(/^\d+$/, "Membership ID must contain only numbers.").min(1, "Membership ID is required."),
   fullName: z.string().min(2, {
     message: "Full name must be at least 2 characters.",
   }),
@@ -159,10 +159,11 @@ export function EnrollmentForm() {
     }
     
     try {
+        const fullMemberId = `MEM-${values.memberId}`;
         const { memberId, ...restOfValues } = values;
         const finalValues = { 
             ...restOfValues,
-            id: memberId, // Use the custom memberId as the canonical ID
+            id: fullMemberId, // Use the prefixed memberId as the canonical ID
             photo, 
             idFront, 
             idBack, 
@@ -174,11 +175,11 @@ export function EnrollmentForm() {
             status: 'Checked Out',
         };
         
-        const memberDocRef = doc(firestore, 'memberships', memberId);
+        const memberDocRef = doc(firestore, 'memberships', fullMemberId);
         // This is a non-blocking write.
         setDocumentNonBlocking(memberDocRef, finalValues, {});
         
-        setNewMember({ id: memberId, name: values.fullName });
+        setNewMember({ id: fullMemberId, name: values.fullName });
         setEnrollmentSuccess(true);
         toast({
             title: "Enrollment Successful",
@@ -297,7 +298,17 @@ export function EnrollmentForm() {
                                 )}
                             </div>
                             <FormControl>
-                            <Input placeholder="Enter custom member ID" {...field} />
+                                <div className="flex items-center">
+                                    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-background text-sm text-muted-foreground">
+                                        MEM-
+                                    </span>
+                                    <Input
+                                        placeholder="12345"
+                                        type="number"
+                                        className="rounded-l-none"
+                                        {...field}
+                                    />
+                                </div>
                             </FormControl>
                             <FormDescription>This ID must be unique.</FormDescription>
                             <FormMessage />
